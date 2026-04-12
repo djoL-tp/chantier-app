@@ -4,4 +4,3 @@ Pillow
 reportlab
 streamlit-drawable-canvas
 openpyxl
-supabase
