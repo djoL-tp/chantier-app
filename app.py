@@ -16,12 +16,13 @@ from openpyxl import Workbook, load_workbook
 # -------------------------
 import firebase_admin
 from firebase_admin import credentials, firestore
-
-st.set_page_config(page_title="V15 PRO MAX", layout="wide")
-st.title("📋 Chantier V15 PRO MAX CLOUD")
+import os
 
 if not firebase_admin._apps:
     cred = credentials.Certificate("data/serviceAccountKey.json")
+
+    # 🔥 IMPORTANT : forcer variable environnement
+    os.environ["GOOGLE_CLOUD_PROJECT"] = "chantier-app-40475"
 
     firebase_admin.initialize_app(cred, {
         "projectId": "chantier-app-40475"
