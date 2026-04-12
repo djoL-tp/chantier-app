@@ -4,4 +4,4 @@ Pillow
 reportlab
 streamlit-drawable-canvas
 openpyxl
-firebase-admin
+supabase
