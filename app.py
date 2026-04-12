@@ -9,43 +9,29 @@ from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
 
-from openpyxl import Workbook, load_workbook
+from supabase import create_client
 
 # -------------------------
-# ☁️ FIREBASE (BLOC CORRIGÉ)
+# ☁️ SUPABASE INIT
 # -------------------------
-import firebase_admin
-from firebase_admin import credentials, firestore
-import os
+SUPABASE_URL = "https://XXXX.supabase.co"
+SUPABASE_KEY = "TON_ANON_KEY"
 
-PROJECT_ID = "chantier-app-40475"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-if not firebase_admin._apps:
-    cred = credentials.Certificate("data/serviceAccountKey.json")
-
-    # 🔥 FORCE ENV (obligatoire sur Streamlit Cloud)
-    os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID
-    os.environ["GCLOUD_PROJECT"] = PROJECT_ID
-    os.environ["CLOUD_PROJECT"] = PROJECT_ID
-
-    firebase_admin.initialize_app(cred, {
-        "projectId": PROJECT_ID
-    })
-
-# 🔥 IMPORTANT : client avec projet forcé
-db = firestore.client()
+st.set_page_config(page_title="V16 PRO MAX", layout="wide")
+st.title("📋 Chantier V16 PRO MAX SUPABASE")
 
 # -------------------------
 # 📅 DATE
 # -------------------------
 date_jour = datetime.now().strftime("%d/%m/%Y")
-
 st.write("📅 Date :", date_jour)
 
 # -------------------------
 # 📍 CHANTIER
 # -------------------------
-chantier = st.text_input("🏗 Chantier (manuel)")
+chantier = st.text_input("🏗 Chantier")
 
 # -------------------------
 # 🌍 LOCALISATION
@@ -94,28 +80,8 @@ total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
 st.write("🕒 Total :", fmt(total))
 
 # -------------------------
-# 📸 PHOTOS
-# -------------------------
-st.subheader("📸 Photos chantier")
-
-photos = st.file_uploader(
-    "Ajouter photos",
-    type=["jpg", "jpeg", "png"],
-    accept_multiple_files=True
-)
-
-legendes = []
-
-if photos:
-    for i, p in enumerate(photos):
-        leg = st.text_input(f"Légende photo {i+1}", key=f"leg_{i}")
-        legendes.append(leg)
-
-# -------------------------
 # ✍️ SIGNATURE
 # -------------------------
-st.subheader("✍️ Signature")
-
 canvas = st_canvas(
     stroke_width=3,
     stroke_color="black",
@@ -134,7 +100,25 @@ if canvas.image_data is not None:
     img.save(signature_path)
 
 # -------------------------
-# 📦 DATA FINAL
+# 📸 PHOTOS
+# -------------------------
+st.subheader("📸 Photos chantier")
+
+photos = st.file_uploader(
+    "Ajouter photos",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
+
+legendes = []
+
+if photos:
+    for i, p in enumerate(photos):
+        leg = st.text_input(f"Légende photo {i+1}", key=f"leg{i}")
+        legendes.append(leg)
+
+# -------------------------
+# 📦 DATA
 # -------------------------
 data = {
     "date": date_jour,
@@ -147,11 +131,11 @@ data = {
 }
 
 # -------------------------
-# 💾 SAVE LOCAL + CLOUD
+# 💾 SAVE SUPABASE + LOCAL
 # -------------------------
-if st.button("💾 ENREGISTRER"):
+if st.button("💾 ENREGISTRER CLOUD"):
 
-    # LOCAL
+    # LOCAL BACKUP
     historique = []
 
     if os.path.exists("historique.json"):
@@ -163,20 +147,20 @@ if st.button("💾 ENREGISTRER"):
     with open("historique.json", "w") as f:
         json.dump(historique, f, indent=4)
 
-    # CLOUD FIREBASE
-    db.collection("chantiers").add(data)
+    # CLOUD SUPABASE
+    supabase.table("chantiers").insert(data).execute()
 
-    st.success("Sauvegarde OK ☁️ + LOCAL")
+    st.success("Sauvegarde cloud + local OK ☁️")
 
 # -------------------------
-# 📄 PDF PRO
+# 📄 PDF
 # -------------------------
-def generate_pdf():
+def pdf():
     doc = SimpleDocTemplate("rapport.pdf")
     styles = getSampleStyleSheet()
     e = []
 
-    e.append(Paragraph("RAPPORT CHANTIER V15 PRO MAX", styles["Title"]))
+    e.append(Paragraph("RAPPORT CHANTIER V16 PRO MAX", styles["Title"]))
     e.append(Spacer(1, 20))
 
     e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
@@ -200,8 +184,7 @@ def generate_pdf():
         for i, p in enumerate(photos):
             img = PILImage.open(p)
             img.thumbnail((800, 800))
-
-            path = f"photo_{i}.jpg"
+            path = f"p{i}.jpg"
             img.save(path)
 
             e.append(Image(path, width=300, height=200))
@@ -212,16 +195,15 @@ def generate_pdf():
     doc.build(e)
 
 # -------------------------
-# 📄 PDF DOWNLOAD
+# 📄 DOWNLOAD PDF
 # -------------------------
-if st.button("📄 Générer PDF"):
-    generate_pdf()
-
+if st.button("📄 PDF"):
+    pdf()
     with open("rapport.pdf", "rb") as f:
         st.download_button("Télécharger PDF", f, "rapport.pdf")
 
 # -------------------------
-# 📊 EXCEL PRO
+# 📊 EXCEL
 # -------------------------
 def to_decimal(h):
     try:
@@ -231,7 +213,7 @@ def to_decimal(h):
         return 0
 
 
-if st.button("📊 EXPORT EXCEL"):
+if st.button("📊 EXCEL"):
 
     file = "chantier.xlsx"
 
@@ -264,8 +246,8 @@ if st.button("📊 EXPORT EXCEL"):
 # -------------------------
 # ☁️ CLOUD VIEW
 # -------------------------
-st.subheader("☁️ Cloud Firebase")
+st.subheader("☁️ Historique Cloud")
 
-docs = db.collection("chantiers").stream()
+res = supabase.table("chantiers").select("*").execute()
 
-st.write([d.to_dict() for d in docs])
+st.write(res.data)
