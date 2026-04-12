@@ -7,51 +7,42 @@ from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
 import pandas as pd
+from openpyxl import Workbook, load_workbook
 
-st.title("📋 Rapport de chantier BTP V11")
+st.set_page_config(page_title="BTP PRO MAX", layout="wide")
+
+st.title("📋 Rapport de chantier V11 PRO MAX")
 
 # -------------------------
 # 📅 DATE
 # -------------------------
 date_jour = datetime.now().strftime("%d/%m/%Y")
-st.write("Date :", date_jour)
+st.write("📅 Date :", date_jour)
 
 # -------------------------
 # 📍 CHANTIER (SAISIE LIBRE)
 # -------------------------
-chantier = st.text_input("Nom du chantier")
+chantier = st.text_input("🏗 Chantier")
 
 # -------------------------
-# 🌍 GPS (manuel + bouton)
+# 🌍 LOCALISATION
 # -------------------------
-st.subheader("Localisation")
-
-localisation = st.text_input("Adresse ou lieu")
-
-if st.button("📍 Utiliser ma position"):
-    st.info("👉 Active la localisation dans ton navigateur (Streamlit ne récupère pas automatiquement le GPS iPhone sans plugin)")
+localisation = st.text_input("📍 Localisation / Adresse")
 
 # -------------------------
 # 🚜 ENGIN
 # -------------------------
-engin = st.text_input("Engin utilisé")
+engin = st.text_input("🚜 Engin utilisé")
 
 # -------------------------
-# 🧾 TRAVAIL
+# 🧾 TRAVAIL EFFECTUÉ
 # -------------------------
-travail = st.text_area("Travail effectué")
+travail = st.text_area("🧾 Travail effectué")
 
 # -------------------------
-# 📸 PHOTOS
+# ⏱ HORAIRES
 # -------------------------
-st.subheader("Photos chantier")
-
-photos = st.file_uploader("Ajouter des photos", accept_multiple_files=True)
-
-# -------------------------
-# ⏱️ HORAIRES
-# -------------------------
-st.subheader("Horaires")
+st.subheader("⏱ Horaires")
 
 col1, col2 = st.columns(2)
 
@@ -73,20 +64,20 @@ def calcul_duree(debut, fin):
     return timedelta(0)
 
 
-def format_duree(duree):
-    heures = duree.seconds // 3600
-    minutes = (duree.seconds % 3600) // 60
+def format_duree(d):
+    heures = d.seconds // 3600
+    minutes = (d.seconds % 3600) // 60
     return f"{heures}h{minutes:02d}"
 
 
 total = calcul_duree(debut_matin, fin_matin) + calcul_duree(debut_aprem, fin_aprem)
 
-st.write("🕒 Total :", format_duree(total))
+st.write("🕒 Total travaillé :", format_duree(total))
 
 # -------------------------
 # ✍️ SIGNATURE
 # -------------------------
-st.subheader("Signature")
+st.subheader("✍️ Signature")
 
 canvas_result = st_canvas(
     stroke_width=3,
@@ -101,12 +92,12 @@ canvas_result = st_canvas(
 signature_path = None
 
 if canvas_result.image_data is not None:
-    img = PILImage.fromarray(canvas_result.image_data.astype('uint8'))
+    img = PILImage.fromarray(canvas_result.image_data.astype("uint8"))
     signature_path = "signature.png"
     img.save(signature_path)
 
 # -------------------------
-# 💾 DONNÉES
+# 📦 DATA
 # -------------------------
 data = {
     "date": date_jour,
@@ -121,11 +112,11 @@ data = {
 # 💾 HISTORIQUE JSON
 # -------------------------
 if st.button("💾 Enregistrer"):
+    historique = []
+
     if os.path.exists("historique.json"):
         with open("historique.json", "r") as f:
             historique = json.load(f)
-    else:
-        historique = []
 
     historique.append(data)
 
@@ -135,61 +126,84 @@ if st.button("💾 Enregistrer"):
     st.success("Enregistré ✅")
 
 # -------------------------
-# 📄 PDF COMPLET
+# 📄 PDF PRO
 # -------------------------
 def generer_pdf():
     doc = SimpleDocTemplate("rapport.pdf")
     styles = getSampleStyleSheet()
     elements = []
 
-    elements.append(Paragraph("RAPPORT DE CHANTIER", styles['Title']))
+    elements.append(Paragraph("RAPPORT DE CHANTIER", styles["Title"]))
     elements.append(Spacer(1, 20))
 
-    elements.append(Paragraph(f"Date : {data['date']}", styles['Normal']))
-    elements.append(Paragraph(f"Chantier : {data['chantier']}", styles['Normal']))
-    elements.append(Paragraph(f"Lieu : {data['localisation']}", styles['Normal']))
-    elements.append(Paragraph(f"Engin : {data['engin']}", styles['Normal']))
-    elements.append(Paragraph(f"Heures : {data['heures']}", styles['Normal']))
+    elements.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
+    elements.append(Paragraph(f"Chantier : {data['chantier']}", styles["Normal"]))
+    elements.append(Paragraph(f"Localisation : {data['localisation']}", styles["Normal"]))
+    elements.append(Paragraph(f"Engin : {data['engin']}", styles["Normal"]))
+    elements.append(Paragraph(f"Heures : {data['heures']}", styles["Normal"]))
 
     elements.append(Spacer(1, 10))
-    elements.append(Paragraph("Travail effectué :", styles['Heading2']))
-    elements.append(Paragraph(data['travail'], styles['Normal']))
+    elements.append(Paragraph("Travail effectué :", styles["Heading2"]))
+    elements.append(Paragraph(data["travail"], styles["Normal"]))
 
-    # SIGNATURE
     if signature_path:
         elements.append(Spacer(1, 20))
-        elements.append(Paragraph("Signature :", styles['Heading2']))
+        elements.append(Paragraph("Signature :", styles["Heading2"]))
         elements.append(Image(signature_path, width=200, height=100))
-
-    # PHOTOS
-    if photos:
-        elements.append(Spacer(1, 20))
-        elements.append(Paragraph("Photos chantier :", styles['Heading2']))
-        for photo in photos:
-            image = PILImage.open(photo)
-            path = f"photo_{photo.name}"
-            image.save(path)
-            elements.append(Image(path, width=300, height=200))
-            elements.append(Spacer(1, 10))
 
     doc.build(elements)
 
+# -------------------------
+# 📊 EXCEL PRO (HISTORIQUE GLOBAL)
+# -------------------------
+def heures_to_decimal(h):
+    try:
+        h1, m1 = h.split("h")
+        return float(h1) + float(m1) / 60
+    except:
+        return 0
 
+
+if st.button("📊 Export Excel PRO"):
+
+    fichier = "rapport_chantier.xlsx"
+
+    if not os.path.exists(fichier):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Chantiers"
+        ws.append(["Date", "Chantier", "Localisation", "Engin", "Travail", "Heures"])
+        wb.save(fichier)
+
+    wb = load_workbook(fichier)
+    ws = wb.active
+
+    ws.append([
+        data["date"],
+        data["chantier"],
+        data["localisation"],
+        data["engin"],
+        data["travail"],
+        heures_to_decimal(data["heures"]),
+    ])
+
+    last_row = ws.max_row
+    ws["G1"] = "TOTAL HEURES"
+    ws["G2"] = f"=SUM(F2:F{last_row})"
+
+    wb.save(fichier)
+
+    with open(fichier, "rb") as f:
+        st.download_button("📥 Télécharger Excel PRO", f, file_name="rapport_chantier.xlsx")
+
+# -------------------------
+# 📄 PDF DOWNLOAD
+# -------------------------
 if st.button("📄 Générer PDF"):
     generer_pdf()
 
     with open("rapport.pdf", "rb") as f:
-        st.download_button("📥 Télécharger le PDF", f, "rapport_chantier.pdf")
-
-# -------------------------
-# 📊 EXCEL
-# -------------------------
-if st.button("📊 Export Excel"):
-    df = pd.DataFrame([data])
-    df.to_excel("rapport.xlsx", index=False)
-
-    with open("rapport.xlsx", "rb") as f:
-        st.download_button("📥 Télécharger Excel", f, "rapport.xlsx")
+        st.download_button("📥 Télécharger PDF", f, file_name="rapport.pdf")
 
 # -------------------------
 # 📊 HISTORIQUE
