@@ -1,5 +1,0 @@
-streamlit
-pandas
-Pillow
-reportlab
-streamlit-drawable-canvas
