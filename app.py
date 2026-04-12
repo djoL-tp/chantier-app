@@ -1,302 +1,240 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CHANTIER V17.1 CLEAN</title>
+import streamlit as st
+from datetime import datetime, timedelta
+import json
+import os
 
-<style>
-body{
-font-family: Arial;
-margin:0;
-background:#0f172a;
-color:white;
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet
+
+from streamlit_drawable_canvas import st_canvas
+from PIL import Image as PILImage
+
+from openpyxl import Workbook, load_workbook
+
+st.set_page_config(page_title="V17 PRO MAX CLEAN", layout="wide")
+st.title("📋 Chantier V17 PRO MAX (STABLE)")
+
+# -------------------------
+# 📅 DATE
+# -------------------------
+date_jour = datetime.now().strftime("%d/%m/%Y")
+st.write("📅 Date :", date_jour)
+
+# -------------------------
+# 📍 CHANTIER (manuel uniquement)
+# -------------------------
+chantier = st.text_input("🏗 Chantier (saisie manuelle)")
+
+# -------------------------
+# 🌍 LOCALISATION
+# -------------------------
+localisation = st.text_input("📍 Localisation")
+
+# -------------------------
+# 🚜 ENGIN (ligne libre comme demandé)
+# -------------------------
+engin = st.text_input("🚜 Engin utilisé (ligne libre)")
+
+# -------------------------
+# 🧾 TRAVAIL
+# -------------------------
+travail = st.text_area("🧾 Travail effectué")
+
+# -------------------------
+# ⏱ HORAIRES (simple)
+# -------------------------
+col1, col2 = st.columns(2)
+
+with col1:
+    debut_matin = st.time_input("Début matin")
+    fin_matin = st.time_input("Fin matin")
+
+with col2:
+    debut_aprem = st.time_input("Début après-midi")
+    fin_aprem = st.time_input("Fin après-midi")
+
+
+def calc(d1, d2):
+    if d1 and d2:
+        a = datetime.combine(datetime.today(), d1)
+        b = datetime.combine(datetime.today(), d2)
+        if b > a:
+            return b - a
+    return timedelta(0)
+
+
+def fmt(d):
+    return f"{d.seconds//3600}h{(d.seconds%3600)//60:02d}"
+
+
+total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
+
+st.write("🕒 Total :", fmt(total))
+
+# -------------------------
+# ✍️ SIGNATURE
+# -------------------------
+st.subheader("✍️ Signature")
+
+canvas = st_canvas(
+    stroke_width=3,
+    stroke_color="black",
+    background_color="white",
+    height=150,
+    width=400,
+    drawing_mode="freedraw",
+    key="sig"
+)
+
+signature_path = None
+
+if canvas.image_data is not None:
+    img = PILImage.fromarray(canvas.image_data.astype("uint8"))
+    signature_path = "signature.png"
+    img.save(signature_path)
+
+# -------------------------
+# 📸 PHOTOS
+# -------------------------
+st.subheader("📸 Photos")
+
+photos = st.file_uploader(
+    "Ajouter photos",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
+
+legendes = []
+
+if photos:
+    for i, p in enumerate(photos):
+        leg = st.text_input(f"Légende photo {i+1}", key=f"leg{i}")
+        legendes.append(leg)
+
+# -------------------------
+# 📦 DATA
+# -------------------------
+data = {
+    "date": date_jour,
+    "chantier": chantier,
+    "localisation": localisation,
+    "engin": engin,
+    "travail": travail,
+    "heures": fmt(total),
+    "timestamp": datetime.now().isoformat()
 }
 
-header{
-background:#111827;
-padding:15px;
-text-align:center;
-font-size:20px;
-font-weight:bold;
-}
+# -------------------------
+# 💾 SAUVEGARDE LOCALE UNIQUEMENT (ULTRA STABLE)
+# -------------------------
+if st.button("💾 ENREGISTRER"):
 
-.container{
-padding:15px;
-}
+    historique = []
 
-.card{
-background:#1f2937;
-padding:15px;
-border-radius:12px;
-margin-bottom:15px;
-}
+    if os.path.exists("historique.json"):
+        with open("historique.json", "r") as f:
+            historique = json.load(f)
 
-input, textarea, button{
-width:100%;
-padding:10px;
-margin-top:8px;
-border-radius:8px;
-border:none;
-font-size:14px;
-}
+    historique.append(data)
 
-button{
-background:#2563eb;
-color:white;
-font-weight:bold;
-cursor:pointer;
-}
+    with open("historique.json", "w") as f:
+        json.dump(historique, f, indent=4)
 
-button.red{
-background:#dc2626;
-}
+    st.success("Sauvegarde OK ✔ (local sécurisé)")
 
-.row{
-display:flex;
-gap:10px;
-}
+# -------------------------
+# 📄 PDF
+# -------------------------
+def pdf():
+    doc = SimpleDocTemplate("rapport.pdf")
+    styles = getSampleStyleSheet()
+    e = []
 
-.row button{
-flex:1;
-}
+    e.append(Paragraph("RAPPORT CHANTIER V17 PRO MAX", styles["Title"]))
+    e.append(Spacer(1, 20))
 
-.item{
-background:#111827;
-padding:10px;
-border-radius:10px;
-margin-top:10px;
-}
-</style>
-</head>
+    e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
+    e.append(Paragraph(f"Chantier : {data['chantier']}", styles["Normal"]))
+    e.append(Paragraph(f"Localisation : {data['localisation']}", styles["Normal"]))
+    e.append(Paragraph(f"Engin : {data['engin']}", styles["Normal"]))
+    e.append(Paragraph(f"Heures : {data['heures']}", styles["Normal"]))
 
-<body>
+    e.append(Spacer(1, 10))
+    e.append(Paragraph("Travail :", styles["Heading2"]))
+    e.append(Paragraph(data["travail"], styles["Normal"]))
 
-<header>🚧 CHANTIER V17.1 CLEAN</header>
+    if signature_path:
+        e.append(Spacer(1, 20))
+        e.append(Image(signature_path, width=200, height=100))
 
-<div class="container">
+    if photos:
+        e.append(Spacer(1, 20))
+        e.append(Paragraph("Photos :", styles["Heading2"]))
 
-<!-- ENGINS -->
-<div class="card">
-<h3>🚜 Engins</h3>
-<input id="enginInput" placeholder="Nom engin + heures">
-<button onclick="addEngin()">Ajouter</button>
-<div id="enginList"></div>
-</div>
+        for i, p in enumerate(photos):
+            img = PILImage.open(p)
+            img.thumbnail((800, 800))
+            path = f"photo_{i}.jpg"
+            img.save(path)
 
-<!-- NOTES -->
-<div class="card">
-<h3>📝 Notes chantier</h3>
-<textarea id="note" placeholder="Infos chantier..."></textarea>
-<button onclick="saveNote()">Sauvegarder</button>
-</div>
+            e.append(Image(path, width=300, height=200))
 
-<!-- PHOTOS -->
-<div class="card">
-<h3>📸 Photos chantier</h3>
-<input type="file" id="photoInput" accept="image/*" multiple>
-<button onclick="savePhotos()">Enregistrer photos</button>
-<div id="photoList"></div>
-</div>
+            if i < len(legendes):
+                e.append(Paragraph(legendes[i], styles["Normal"]))
 
-<!-- SIGNATURE -->
-<div class="card">
-<h3>✍️ Signature ouvrier</h3>
+    doc.build(e)
 
-<canvas id="canvas" width="300" height="120"
-style="background:white;border-radius:8px;"></canvas>
+# -------------------------
+# 📄 DOWNLOAD PDF
+# -------------------------
+if st.button("📄 PDF"):
+    pdf()
+    with open("rapport.pdf", "rb") as f:
+        st.download_button("Télécharger PDF", f, "rapport.pdf")
 
-<div class="row">
-<button onclick="clearCanvas()">Effacer</button>
-<button onclick="saveSig()">Sauver</button>
-</div>
-
-<img id="sigImg" style="margin-top:10px;max-width:100%;">
-</div>
-
-<!-- GESTION HISTORIQUE -->
-<div class="card">
-<h3>🧹 Gestion historique</h3>
-
-<button class="red" onclick="clearAll()">Tout supprimer</button>
-
-<div class="row">
-<button onclick="clearEngins()">Engins</button>
-<button onclick="clearNote()">Note</button>
-</div>
-
-<div class="row">
-<button onclick="clearPhotos()">Photos</button>
-<button onclick="clearSignature()">Signature</button>
-</div>
-
-</div>
-
-</div>
-
-<script>
-
-let engins = JSON.parse(localStorage.getItem("engins") || "[]");
+# -------------------------
+# 📊 EXCEL
+# -------------------------
+def to_decimal(h):
+    try:
+        a, b = h.split("h")
+        return float(a) + float(b)/60
+    except:
+        return 0
 
 
-// ================= ENGINS =================
-function renderEngins(){
-document.getElementById("enginList").innerHTML =
-engins.map((e,i)=>`
-<div class="item">
-${e}
-<button class="red" onclick="deleteEngin(${i})">Supprimer</button>
-</div>
-`).join("");
-}
+if st.button("📊 EXCEL"):
 
-function addEngin(){
-let val = document.getElementById("enginInput").value;
-if(!val) return;
+    file = "chantier.xlsx"
 
-engins.push(val);
-localStorage.setItem("engins", JSON.stringify(engins));
-document.getElementById("enginInput").value="";
-renderEngins();
-}
+    if not os.path.exists(file):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Date", "Chantier", "Localisation", "Engin", "Travail", "Heures"])
+        wb.save(file)
 
-function deleteEngin(i){
-engins.splice(i,1);
-localStorage.setItem("engins", JSON.stringify(engins));
-renderEngins();
-}
+    wb = load_workbook(file)
+    ws = wb.active
 
-renderEngins();
+    ws.append([
+        data["date"],
+        data["chantier"],
+        data["localisation"],
+        data["engin"],
+        data["travail"],
+        to_decimal(data["heures"])
+    ])
 
+    wb.save(file)
 
-// ================= NOTES =================
-document.getElementById("note").value =
-localStorage.getItem("note") || "";
+    with open(file, "rb") as f:
+        st.download_button("Télécharger Excel", f, "chantier.xlsx")
 
-function saveNote(){
-localStorage.setItem("note",
-document.getElementById("note").value);
-alert("Note sauvegardée");
-}
+# -------------------------
+# 📂 HISTORIQUE
+# -------------------------
+st.subheader("📂 Historique local")
 
-
-// ================= PHOTOS =================
-function savePhotos(){
-let input = document.getElementById("photoInput");
-let stored = JSON.parse(localStorage.getItem("photos") || "[]");
-
-for(let f of input.files){
-let reader = new FileReader();
-
-reader.onload = function(e){
-stored.push(e.target.result);
-localStorage.setItem("photos", JSON.stringify(stored));
-renderPhotos();
-};
-
-reader.readAsDataURL(f);
-}
-}
-
-function renderPhotos(){
-let photos = JSON.parse(localStorage.getItem("photos") || "[]");
-
-document.getElementById("photoList").innerHTML =
-photos.map(p=>`
-<img src="${p}"
-style="width:100%;margin-top:10px;border-radius:10px;">
-`).join("");
-}
-
-renderPhotos();
-
-
-// ================= SIGNATURE =================
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
-let drawing = false;
-
-canvas.addEventListener("mousedown", ()=>drawing=true);
-canvas.addEventListener("mouseup", ()=>drawing=false);
-canvas.addEventListener("mousemove", draw);
-
-canvas.addEventListener("touchstart", ()=>drawing=true);
-canvas.addEventListener("touchend", ()=>drawing=false);
-canvas.addEventListener("touchmove", drawTouch);
-
-function draw(e){
-if(!drawing) return;
-ctx.fillStyle="black";
-ctx.beginPath();
-ctx.arc(e.offsetX, e.offsetY, 2, 0, Math.PI*2);
-ctx.fill();
-}
-
-function drawTouch(e){
-let t = e.touches[0];
-let rect = canvas.getBoundingClientRect();
-
-ctx.fillStyle="black";
-ctx.beginPath();
-ctx.arc(
-t.clientX - rect.left,
-t.clientY - rect.top,
-2,0,Math.PI*2
-);
-ctx.fill();
-}
-
-function clearCanvas(){
-ctx.clearRect(0,0,canvas.width,canvas.height);
-}
-
-function saveSig(){
-let data = canvas.toDataURL();
-localStorage.setItem("signature", data);
-document.getElementById("sigImg").src = data;
-}
-
-if(localStorage.getItem("signature")){
-document.getElementById("sigImg").src =
-localStorage.getItem("signature");
-}
-
-
-// ================= SUPPRESSION =================
-function clearAll(){
-if(!confirm("Supprimer TOUT le chantier ?")) return;
-
-clearEngins();
-clearNote();
-clearPhotos();
-clearSignature();
-
-alert("Tout l'historique a été supprimé");
-}
-
-function clearEngins(){
-localStorage.removeItem("engins");
-engins = [];
-renderEngins();
-}
-
-function clearNote(){
-localStorage.removeItem("note");
-document.getElementById("note").value = "";
-}
-
-function clearPhotos(){
-localStorage.removeItem("photos");
-document.getElementById("photoList").innerHTML = "";
-}
-
-function clearSignature(){
-localStorage.removeItem("signature");
-ctx.clearRect(0,0,canvas.width,canvas.height);
-document.getElementById("sigImg").src = "";
-}
-
-</script>
-
-</body>
-</html>
+if os.path.exists("historique.json"):
+    with open("historique.json", "r") as f:
+        st.write(json.load(f))
