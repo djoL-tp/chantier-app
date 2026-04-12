@@ -18,16 +18,21 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import os
 
+PROJECT_ID = "chantier-app-40475"
+
 if not firebase_admin._apps:
     cred = credentials.Certificate("data/serviceAccountKey.json")
 
-    # 🔥 IMPORTANT : forcer variable environnement
-    os.environ["GOOGLE_CLOUD_PROJECT"] = "chantier-app-40475"
+    # 🔥 FORCE ENV (obligatoire sur Streamlit Cloud)
+    os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID
+    os.environ["GCLOUD_PROJECT"] = PROJECT_ID
+    os.environ["CLOUD_PROJECT"] = PROJECT_ID
 
     firebase_admin.initialize_app(cred, {
-        "projectId": "chantier-app-40475"
+        "projectId": PROJECT_ID
     })
 
+# 🔥 IMPORTANT : client avec projet forcé
 db = firestore.client()
 
 # -------------------------
