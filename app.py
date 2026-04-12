@@ -2,26 +2,29 @@ import streamlit as st
 from datetime import datetime, timedelta
 import json
 import os
+
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet
+
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
+
 from openpyxl import Workbook, load_workbook
 
+# -------------------------
+# ☁️ FIREBASE (BLOC CORRIGÉ)
+# -------------------------
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-st.set_page_config(page_title="V14 PRO MAX", layout="wide")
-st.title("📋 Chantier V14 PRO MAX STABLE")
+st.set_page_config(page_title="V15 PRO MAX", layout="wide")
+st.title("📋 Chantier V15 PRO MAX CLOUD")
 
-# -------------------------
-# ☁️ FIREBASE FIX COMPLET
-# -------------------------
 if not firebase_admin._apps:
     cred = credentials.Certificate("data/serviceAccountKey.json")
 
     firebase_admin.initialize_app(cred, {
-    "projectId": "chantier-app-40475"
+        "projectId": "chantier-app-40475"
     })
 
 db = firestore.client()
@@ -36,7 +39,7 @@ st.write("📅 Date :", date_jour)
 # -------------------------
 # 📍 CHANTIER
 # -------------------------
-chantier = st.text_input("🏗 Chantier")
+chantier = st.text_input("🏗 Chantier (manuel)")
 
 # -------------------------
 # 🌍 LOCALISATION
@@ -85,6 +88,24 @@ total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
 st.write("🕒 Total :", fmt(total))
 
 # -------------------------
+# 📸 PHOTOS
+# -------------------------
+st.subheader("📸 Photos chantier")
+
+photos = st.file_uploader(
+    "Ajouter photos",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
+
+legendes = []
+
+if photos:
+    for i, p in enumerate(photos):
+        leg = st.text_input(f"Légende photo {i+1}", key=f"leg_{i}")
+        legendes.append(leg)
+
+# -------------------------
 # ✍️ SIGNATURE
 # -------------------------
 st.subheader("✍️ Signature")
@@ -107,7 +128,7 @@ if canvas.image_data is not None:
     img.save(signature_path)
 
 # -------------------------
-# 📦 DATA
+# 📦 DATA FINAL
 # -------------------------
 data = {
     "date": date_jour,
@@ -142,14 +163,14 @@ if st.button("💾 ENREGISTRER"):
     st.success("Sauvegarde OK ☁️ + LOCAL")
 
 # -------------------------
-# 📄 PDF
+# 📄 PDF PRO
 # -------------------------
-def pdf():
+def generate_pdf():
     doc = SimpleDocTemplate("rapport.pdf")
     styles = getSampleStyleSheet()
     e = []
 
-    e.append(Paragraph("RAPPORT CHANTIER V14 PRO MAX", styles["Title"]))
+    e.append(Paragraph("RAPPORT CHANTIER V15 PRO MAX", styles["Title"]))
     e.append(Spacer(1, 20))
 
     e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
@@ -166,13 +187,30 @@ def pdf():
         e.append(Spacer(1, 20))
         e.append(Image(signature_path, width=200, height=100))
 
+    if photos:
+        e.append(Spacer(1, 20))
+        e.append(Paragraph("Photos :", styles["Heading2"]))
+
+        for i, p in enumerate(photos):
+            img = PILImage.open(p)
+            img.thumbnail((800, 800))
+
+            path = f"photo_{i}.jpg"
+            img.save(path)
+
+            e.append(Image(path, width=300, height=200))
+
+            if i < len(legendes):
+                e.append(Paragraph(legendes[i], styles["Normal"]))
+
     doc.build(e)
 
 # -------------------------
 # 📄 PDF DOWNLOAD
 # -------------------------
-if st.button("📄 PDF"):
-    pdf()
+if st.button("📄 Générer PDF"):
+    generate_pdf()
+
     with open("rapport.pdf", "rb") as f:
         st.download_button("Télécharger PDF", f, "rapport.pdf")
 
@@ -187,7 +225,7 @@ def to_decimal(h):
         return 0
 
 
-if st.button("📊 EXCEL"):
+if st.button("📊 EXPORT EXCEL"):
 
     file = "chantier.xlsx"
 
@@ -215,7 +253,7 @@ if st.button("📊 EXCEL"):
     wb.save(file)
 
     with open(file, "rb") as f:
-        st.download_button("Télécharger Excel", f, file_name="chantier.xlsx")
+        st.download_button("Télécharger Excel", f, "chantier.xlsx")
 
 # -------------------------
 # ☁️ CLOUD VIEW
