@@ -40,7 +40,7 @@ st.title("📋 Chantier V17 PRO MAX CLEAN")
 
 
 # =========================
-# 📊 CHARGEMENT HISTORIQUE
+# 📂 HISTORIQUE CHARGEMENT
 # =========================
 file_json = "historique.json"
 
@@ -52,23 +52,38 @@ else:
 
 
 # =========================
-# 📅 DATE
+# 📅 DATE FRANÇAISE
 # =========================
 st.subheader("📅 Date du chantier")
 
 date_obj = st.date_input("Choisir la date", value=datetime.now())
-date_jour = date_obj.strftime("%d/%m/%Y")
+
+jours = [
+    "lundi", "mardi", "mercredi", "jeudi",
+    "vendredi", "samedi", "dimanche"
+]
+
+mois = [
+    "janvier", "février", "mars", "avril",
+    "mai", "juin", "juillet", "août",
+    "septembre", "octobre", "novembre", "décembre"
+]
+
+jour_semaine = jours[date_obj.weekday()]
+mois_nom = mois[date_obj.month - 1]
+
+date_jour = f"{jour_semaine} {date_obj.day} {mois_nom} {date_obj.year}"
 
 st.write("📅 Date :", date_jour)
 
 
 # =========================
-# 🏗 DONNÉES
+# 🏗 DONNÉES CHANTIER
 # =========================
 chantier = st.text_input("🏗 Chantier")
 localisation = st.text_input("📍 Localisation")
 engin = st.text_input("🚜 Engin")
-travail = st.text_area("🧾 Travail")
+travail = st.text_area("🧾 Travail effectué")
 
 
 # =========================
@@ -81,8 +96,8 @@ with col1:
     fin_matin = st.time_input("Fin matin")
 
 with col2:
-    debut_aprem = st.time_input("Début aprem")
-    fin_aprem = st.time_input("Fin aprem")
+    debut_aprem = st.time_input("Début après-midi")
+    fin_aprem = st.time_input("Fin après-midi")
 
 
 def calc(d1, d2):
@@ -104,6 +119,76 @@ st.write("🕒 Total :", fmt(total))
 
 
 # =========================
+# ✍️ SIGNATURE
+# =========================
+st.subheader("✍️ Signature")
+
+canvas = st_canvas(
+    stroke_width=3,
+    stroke_color="black",
+    background_color="white",
+    height=150,
+    width=400,
+    drawing_mode="freedraw",
+    key="sig"
+)
+
+signature_path = None
+
+if canvas.image_data is not None:
+    img = PILImage.fromarray(canvas.image_data.astype("uint8"))
+    signature_path = "signature.png"
+    img.save(signature_path)
+
+
+# =========================
+# 📸 PHOTOS
+# =========================
+st.subheader("📸 Photos")
+
+photos = st.file_uploader(
+    "Ajouter photos",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
+
+legendes = []
+
+if photos:
+    for i, p in enumerate(photos):
+        leg = st.text_input(f"Légende photo {i+1}", key=f"leg{i}")
+        legendes.append(leg)
+
+
+# =========================
+# 📦 DATA
+# =========================
+data = {
+    "date": date_jour,
+    "chantier": chantier,
+    "localisation": localisation,
+    "engin": engin,
+    "travail": travail,
+    "heures": fmt(total),
+    "timestamp": datetime.now().isoformat()
+}
+
+
+# =========================
+# 💾 SAUVEGARDE
+# =========================
+if st.button("💾 ENREGISTRER"):
+
+    historique.append(data)
+
+    with open(file_json, "w") as f:
+        json.dump(historique, f, indent=4)
+
+    st.success("Sauvegarde OK ✔")
+    st.rerun()
+
+
+# =========================
 # 📊 STATISTIQUES
 # =========================
 st.subheader("📊 Statistiques")
@@ -112,10 +197,8 @@ if historique:
 
     df = pd.DataFrame(historique)
 
-    # conversion date
-    df["date"] = pd.to_datetime(df["date"], format="%d/%m/%Y", errors="coerce")
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-    # heures numériques
     def to_decimal(h):
         try:
             a, b = h.split("h")
@@ -125,14 +208,14 @@ if historique:
 
     df["heures_num"] = df["heures"].apply(to_decimal)
 
-    # ================= SEMAINE =================
+    # 📅 SEMAINE
     df["semaine"] = df["date"].dt.isocalendar().week
     semaine = df.groupby("semaine")["heures_num"].sum()
 
     st.write("📅 Heures par semaine")
     st.bar_chart(semaine)
 
-    # ================= MOIS =================
+    # 📆 MOIS
     df["mois"] = df["date"].dt.to_period("M").astype(str)
     mois = df.groupby("mois")["heures_num"].sum()
 
@@ -141,30 +224,6 @@ if historique:
 
 else:
     st.info("Aucune donnée pour statistiques")
-
-
-# =========================
-# 💾 SAUVEGARDE
-# =========================
-if st.button("💾 ENREGISTRER"):
-
-    data = {
-        "date": date_jour,
-        "chantier": chantier,
-        "localisation": localisation,
-        "engin": engin,
-        "travail": travail,
-        "heures": fmt(total),
-        "timestamp": datetime.now().isoformat()
-    }
-
-    historique.append(data)
-
-    with open(file_json, "w") as f:
-        json.dump(historique, f, indent=4)
-
-    st.success("Sauvegarde OK ✔")
-    st.rerun()
 
 
 # =========================
