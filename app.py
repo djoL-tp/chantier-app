@@ -6,9 +6,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
-import base64
+import pandas as pd
 
-st.title("📋 Rapport de chantier BTP")
+st.title("📋 Rapport de chantier BTP V11")
 
 # -------------------------
 # 📅 DATE
@@ -17,24 +17,19 @@ date_jour = datetime.now().strftime("%d/%m/%Y")
 st.write("Date :", date_jour)
 
 # -------------------------
-# 📍 CHANTIER
+# 📍 CHANTIER (SAISIE LIBRE)
 # -------------------------
-st.subheader("Chantier")
-
-chantiers = ["Maison Dupont", "Lotissement Les Vignes", "Voirie centre ville"]
-
-chantier = st.selectbox("Choisir un chantier", chantiers)
-nouveau_chantier = st.text_input("Ou ajouter un chantier")
-
-if nouveau_chantier:
-    chantier = nouveau_chantier
+chantier = st.text_input("Nom du chantier")
 
 # -------------------------
-# 🌍 GEOLOCALISATION
+# 🌍 GPS (manuel + bouton)
 # -------------------------
 st.subheader("Localisation")
 
-localisation = st.text_input("Adresse ou lieu du chantier")
+localisation = st.text_input("Adresse ou lieu")
+
+if st.button("📍 Utiliser ma position"):
+    st.info("👉 Active la localisation dans ton navigateur (Streamlit ne récupère pas automatiquement le GPS iPhone sans plugin)")
 
 # -------------------------
 # 🚜 ENGIN
@@ -42,11 +37,16 @@ localisation = st.text_input("Adresse ou lieu du chantier")
 engin = st.text_input("Engin utilisé")
 
 # -------------------------
-# 🧾 TRAVAIL EFFECTUÉ
+# 🧾 TRAVAIL
 # -------------------------
-st.subheader("Travail effectué")
+travail = st.text_area("Travail effectué")
 
-travail = st.text_area("Description des tâches")
+# -------------------------
+# 📸 PHOTOS
+# -------------------------
+st.subheader("Photos chantier")
+
+photos = st.file_uploader("Ajouter des photos", accept_multiple_files=True)
 
 # -------------------------
 # ⏱️ HORAIRES
@@ -118,7 +118,7 @@ data = {
 }
 
 # -------------------------
-# 💾 SAUVEGARDE
+# 💾 HISTORIQUE JSON
 # -------------------------
 if st.button("💾 Enregistrer"):
     if os.path.exists("historique.json"):
@@ -135,7 +135,7 @@ if st.button("💾 Enregistrer"):
     st.success("Enregistré ✅")
 
 # -------------------------
-# 📄 PDF AVEC SIGNATURE
+# 📄 PDF COMPLET
 # -------------------------
 def generer_pdf():
     doc = SimpleDocTemplate("rapport.pdf")
@@ -150,15 +150,27 @@ def generer_pdf():
     elements.append(Paragraph(f"Lieu : {data['localisation']}", styles['Normal']))
     elements.append(Paragraph(f"Engin : {data['engin']}", styles['Normal']))
     elements.append(Paragraph(f"Heures : {data['heures']}", styles['Normal']))
-    elements.append(Spacer(1, 10))
 
+    elements.append(Spacer(1, 10))
     elements.append(Paragraph("Travail effectué :", styles['Heading2']))
     elements.append(Paragraph(data['travail'], styles['Normal']))
 
+    # SIGNATURE
     if signature_path:
         elements.append(Spacer(1, 20))
         elements.append(Paragraph("Signature :", styles['Heading2']))
         elements.append(Image(signature_path, width=200, height=100))
+
+    # PHOTOS
+    if photos:
+        elements.append(Spacer(1, 20))
+        elements.append(Paragraph("Photos chantier :", styles['Heading2']))
+        for photo in photos:
+            image = PILImage.open(photo)
+            path = f"photo_{photo.name}"
+            image.save(path)
+            elements.append(Image(path, width=300, height=200))
+            elements.append(Spacer(1, 10))
 
     doc.build(elements)
 
@@ -167,11 +179,17 @@ if st.button("📄 Générer PDF"):
     generer_pdf()
 
     with open("rapport.pdf", "rb") as f:
-        st.download_button(
-            "📥 Télécharger le PDF",
-            f,
-            file_name="rapport_chantier.pdf"
-        )
+        st.download_button("📥 Télécharger le PDF", f, "rapport_chantier.pdf")
+
+# -------------------------
+# 📊 EXCEL
+# -------------------------
+if st.button("📊 Export Excel"):
+    df = pd.DataFrame([data])
+    df.to_excel("rapport.xlsx", index=False)
+
+    with open("rapport.xlsx", "rb") as f:
+        st.download_button("📥 Télécharger Excel", f, "rapport.xlsx")
 
 # -------------------------
 # 📊 HISTORIQUE
