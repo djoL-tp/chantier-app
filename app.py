@@ -2,23 +2,51 @@ import streamlit as st
 from datetime import datetime, timedelta
 import json
 import os
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
+from PIL import Image as PILImage
+import base64
 
 st.title("📋 Rapport de chantier BTP")
 
 # -------------------------
-# 📅 DATE FRANÇAISE
+# 📅 DATE
 # -------------------------
 date_jour = datetime.now().strftime("%d/%m/%Y")
 st.write("Date :", date_jour)
 
 # -------------------------
-# 🚜 ENGIN (SAISIE LIBRE)
+# 📍 CHANTIER
 # -------------------------
-st.subheader("Engin utilisé")
-engin = st.text_input("Nom de l'engin")
+st.subheader("Chantier")
+
+chantiers = ["Maison Dupont", "Lotissement Les Vignes", "Voirie centre ville"]
+
+chantier = st.selectbox("Choisir un chantier", chantiers)
+nouveau_chantier = st.text_input("Ou ajouter un chantier")
+
+if nouveau_chantier:
+    chantier = nouveau_chantier
+
+# -------------------------
+# 🌍 GEOLOCALISATION
+# -------------------------
+st.subheader("Localisation")
+
+localisation = st.text_input("Adresse ou lieu du chantier")
+
+# -------------------------
+# 🚜 ENGIN
+# -------------------------
+engin = st.text_input("Engin utilisé")
+
+# -------------------------
+# 🧾 TRAVAIL EFFECTUÉ
+# -------------------------
+st.subheader("Travail effectué")
+
+travail = st.text_area("Description des tâches")
 
 # -------------------------
 # ⏱️ HORAIRES
@@ -51,16 +79,14 @@ def format_duree(duree):
     return f"{heures}h{minutes:02d}"
 
 
-duree_matin = calcul_duree(debut_matin, fin_matin)
-duree_aprem = calcul_duree(debut_aprem, fin_aprem)
-total = duree_matin + duree_aprem
+total = calcul_duree(debut_matin, fin_matin) + calcul_duree(debut_aprem, fin_aprem)
 
-st.write("🕒 Total travaillé :", format_duree(total))
+st.write("🕒 Total :", format_duree(total))
 
 # -------------------------
 # ✍️ SIGNATURE
 # -------------------------
-st.subheader("Signature ouvrier")
+st.subheader("Signature")
 
 canvas_result = st_canvas(
     stroke_width=3,
@@ -72,12 +98,22 @@ canvas_result = st_canvas(
     key="canvas",
 )
 
+signature_path = None
+
+if canvas_result.image_data is not None:
+    img = PILImage.fromarray(canvas_result.image_data.astype('uint8'))
+    signature_path = "signature.png"
+    img.save(signature_path)
+
 # -------------------------
 # 💾 DONNÉES
 # -------------------------
 data = {
     "date": date_jour,
+    "chantier": chantier,
+    "localisation": localisation,
     "engin": engin,
+    "travail": travail,
     "heures": format_duree(total)
 }
 
@@ -99,7 +135,7 @@ if st.button("💾 Enregistrer"):
     st.success("Enregistré ✅")
 
 # -------------------------
-# 📄 PDF
+# 📄 PDF AVEC SIGNATURE
 # -------------------------
 def generer_pdf():
     doc = SimpleDocTemplate("rapport.pdf")
@@ -110,15 +146,32 @@ def generer_pdf():
     elements.append(Spacer(1, 20))
 
     elements.append(Paragraph(f"Date : {data['date']}", styles['Normal']))
+    elements.append(Paragraph(f"Chantier : {data['chantier']}", styles['Normal']))
+    elements.append(Paragraph(f"Lieu : {data['localisation']}", styles['Normal']))
     elements.append(Paragraph(f"Engin : {data['engin']}", styles['Normal']))
     elements.append(Paragraph(f"Heures : {data['heures']}", styles['Normal']))
+    elements.append(Spacer(1, 10))
+
+    elements.append(Paragraph("Travail effectué :", styles['Heading2']))
+    elements.append(Paragraph(data['travail'], styles['Normal']))
+
+    if signature_path:
+        elements.append(Spacer(1, 20))
+        elements.append(Paragraph("Signature :", styles['Heading2']))
+        elements.append(Image(signature_path, width=200, height=100))
 
     doc.build(elements)
 
 
 if st.button("📄 Générer PDF"):
     generer_pdf()
-    st.success("PDF généré ✅")
+
+    with open("rapport.pdf", "rb") as f:
+        st.download_button(
+            "📥 Télécharger le PDF",
+            f,
+            file_name="rapport_chantier.pdf"
+        )
 
 # -------------------------
 # 📊 HISTORIQUE
