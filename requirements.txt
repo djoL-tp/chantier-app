@@ -1,7 +1,7 @@
-firebase-admin
 streamlit
 pandas
 Pillow
 reportlab
 streamlit-drawable-canvas
 openpyxl
+firebase-admin
