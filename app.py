@@ -7,26 +7,27 @@ from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
 from openpyxl import Workbook, load_workbook
-
-# -------------------------
-# ☁️ FIREBASE
-# -------------------------
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+st.set_page_config(page_title="V13 PRO MAX ULTRA", layout="wide")
+st.title("📋 Chantier V13 PRO MAX ULTRA")
+
+# -------------------------
+# ☁️ FIREBASE (SAFE INIT)
+# -------------------------
 if not firebase_admin._apps:
-    cred = credentials.Certificate("serviceAccountKey.json")
+    cred = credentials.ApplicationDefault()
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
-
-st.set_page_config(page_title="V13 PRO MAX", layout="wide")
-st.title("📋 Chantier V13 PRO MAX CLOUD")
 
 # -------------------------
 # 📅 DATE
 # -------------------------
 date_jour = datetime.now().strftime("%d/%m/%Y")
+
+st.write("📅 Date :", date_jour)
 
 # -------------------------
 # 📍 CHANTIER
@@ -80,8 +81,24 @@ total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
 st.write("🕒 Total :", fmt(total))
 
 # -------------------------
+# 📸 PHOTOS
+# -------------------------
+st.subheader("📸 Photos chantier")
+
+photos = st.file_uploader("Ajouter photos", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+
+legendes = []
+
+if photos:
+    for i, p in enumerate(photos):
+        leg = st.text_input(f"Légende photo {i+1}", key=i)
+        legendes.append(leg)
+
+# -------------------------
 # ✍️ SIGNATURE
 # -------------------------
+st.subheader("✍️ Signature")
+
 canvas = st_canvas(
     stroke_width=3,
     stroke_color="black",
@@ -113,9 +130,9 @@ data = {
 }
 
 # -------------------------
-# ☁️ + 💾 SAUVEGARDE CLOUD + LOCAL
+# 💾 SAVE LOCAL + CLOUD
 # -------------------------
-if st.button("💾 ENREGISTRER (CLOUD + LOCAL)"):
+if st.button("💾 ENREGISTRER"):
 
     # LOCAL
     historique = []
@@ -129,18 +146,107 @@ if st.button("💾 ENREGISTRER (CLOUD + LOCAL)"):
     with open("historique.json", "w") as f:
         json.dump(historique, f, indent=4)
 
-    # CLOUD FIREBASE
+    # CLOUD FIRESTORE
     db.collection("chantiers").add(data)
 
-    st.success("Sauvegarde locale + cloud OK ☁️")
+    st.success("Sauvegarde OK ☁️ + local")
 
 # -------------------------
-# 📊 CLOUD VIEW
+# 📄 PDF
 # -------------------------
-st.subheader("☁️ Historique Cloud")
+def pdf():
+    doc = SimpleDocTemplate("rapport.pdf")
+    styles = getSampleStyleSheet()
+    e = []
+
+    e.append(Paragraph("RAPPORT CHANTIER V13 ULTRA", styles["Title"]))
+    e.append(Spacer(1, 20))
+
+    e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
+    e.append(Paragraph(f"Chantier : {data['chantier']}", styles["Normal"]))
+    e.append(Paragraph(f"Localisation : {data['localisation']}", styles["Normal"]))
+    e.append(Paragraph(f"Engin : {data['engin']}", styles["Normal"]))
+    e.append(Paragraph(f"Heures : {data['heures']}", styles["Normal"]))
+
+    e.append(Spacer(1, 10))
+    e.append(Paragraph("Travail :", styles["Heading2"]))
+    e.append(Paragraph(data["travail"], styles["Normal"]))
+
+    if signature_path:
+        e.append(Spacer(1, 20))
+        e.append(Image(signature_path, width=200, height=100))
+
+    if photos:
+        e.append(Spacer(1, 20))
+        e.append(Paragraph("Photos :", styles["Heading2"]))
+
+        for i, p in enumerate(photos):
+            img = PILImage.open(p)
+            img.thumbnail((800, 800))
+            path = f"p{i}.jpg"
+            img.save(path)
+
+            e.append(Image(path, width=300, height=200))
+
+            if i < len(legendes):
+                e.append(Paragraph(legendes[i], styles["Normal"]))
+
+    doc.build(e)
+
+# -------------------------
+# 📄 PDF DOWNLOAD
+# -------------------------
+if st.button("📄 PDF"):
+    pdf()
+    with open("rapport.pdf", "rb") as f:
+        st.download_button("Télécharger PDF", f, "rapport.pdf")
+
+# -------------------------
+# 📊 EXCEL PRO
+# -------------------------
+def to_decimal(h):
+    try:
+        a, b = h.split("h")
+        return float(a) + float(b)/60
+    except:
+        return 0
+
+
+if st.button("📊 EXCEL"):
+
+    file = "chantier.xlsx"
+
+    if not os.path.exists(file):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Date", "Chantier", "Localisation", "Engin", "Travail", "Heures"])
+        wb.save(file)
+
+    wb = load_workbook(file)
+    ws = wb.active
+
+    ws.append([
+        data["date"],
+        data["chantier"],
+        data["localisation"],
+        data["engin"],
+        data["travail"],
+        to_decimal(data["heures"])
+    ])
+
+    ws["G1"] = "TOTAL"
+    ws["G2"] = f"=SUM(F2:F{ws.max_row})"
+
+    wb.save(file)
+
+    with open(file, "rb") as f:
+        st.download_button("Télécharger Excel", f, file_name="chantier.xlsx")
+
+# -------------------------
+# ☁️ CLOUD VIEW
+# -------------------------
+st.subheader("☁️ Cloud")
 
 docs = db.collection("chantiers").stream()
 
-cloud = [d.to_dict() for d in docs]
-
-st.write(cloud)
+st.write([d.to_dict() for d in docs])
