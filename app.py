@@ -1,27 +1,82 @@
 import streamlit as st
 from datetime import datetime, date
+import json
+import os
+import pandas as pd
+from PIL import Image as PILImage
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from streamlit_drawable_canvas import st_canvas
-from PIL import Image as PILImage
-import os
 
-st.set_page_config(page_title="Chantier V8 BTP", layout="centered")
+st.set_page_config(page_title="Chantier V10 PRO BTP", layout="centered")
 
-st.title("🚜 APP CHANTIER V8 BTP")
+st.title("🚜 APP CHANTIER V10 PRO BTP")
 
 # ======================
-# INFOS GENERALES
+# FICHIERS DE SAUVEGARDE
+# ======================
+ENGINS_FILE = "engins.json"
+HISTORY_FILE = "historique.csv"
+
+# ======================
+# CHARGEMENT ENGINS (PERSISTANT)
+# ======================
+def load_engins():
+    if os.path.exists(ENGINS_FILE):
+        with open(ENGINS_FILE, "r") as f:
+            return json.load(f)
+    return ["OS", "PB-MAN", "PV1"]
+
+def save_engins(data):
+    with open(ENGINS_FILE, "w") as f:
+        json.dump(data, f)
+
+if "engins" not in st.session_state:
+    st.session_state.engins = load_engins()
+
+# ======================
+# INFOS CHANTIER
 # ======================
 date_chantier = st.date_input("📅 Date", value=date.today())
 chantier = st.text_input("🏗️ Chantier")
 client = st.text_input("👤 Client")
 carburant = st.text_input("⛽ Carburant (L)")
-engins = st.text_area("🚜 Engins utilisés")
 
-gps_lat = st.text_input("📍 Latitude")
-gps_lon = st.text_input("📍 Longitude")
+# ======================
+# ENGINS (SAUVEGARDE PERSISTANTE)
+# ======================
+st.subheader("🚜 Engins (sauvegardés)")
+
+engin_selectionne = st.multiselect(
+    "Choisir les engins utilisés",
+    st.session_state.engins
+)
+
+new_engin = st.text_input("➕ Ajouter un engin")
+
+if st.button("Ajouter engin"):
+    if new_engin and new_engin not in st.session_state.engins:
+        st.session_state.engins.append(new_engin)
+        save_engins(st.session_state.engins)
+        st.success("✔ Engin ajouté et sauvegardé")
+
+# ======================
+# HEURES
+# ======================
+h_debut = st.time_input("🕗 Heure début")
+h_fin = st.time_input("🕔 Heure fin")
+
+total_heures = 0
+if h_debut and h_fin:
+    d1 = datetime.combine(date_chantier, h_debut)
+    d2 = datetime.combine(date_chantier, h_fin)
+    total_heures = (d2 - d1).total_seconds() / 3600
+
+# ======================
+# TRAVAUX
+# ======================
+travaux = st.text_area("🧱 Travaux effectués")
 
 # ======================
 # PHOTOS
@@ -33,7 +88,7 @@ photos = st.file_uploader(
 )
 
 # ======================
-# SIGNATURE OUVRIER
+# SIGNATURE
 # ======================
 st.subheader("✍️ Signature ouvrier")
 
@@ -48,36 +103,17 @@ signature = st_canvas(
 )
 
 # ======================
-# PHASES SIMPLIFIEES
-# ======================
-st.subheader("⏱️ Temps chantier")
-
-h_debut = st.time_input("🕗 Heure début")
-h_fin = st.time_input("🕔 Heure fin")
-
-total_heures = 0
-
-if h_debut and h_fin:
-    d1 = datetime.combine(date_chantier, h_debut)
-    d2 = datetime.combine(date_chantier, h_fin)
-    total_heures = (d2 - d1).total_seconds() / 3600
-
-
-# ======================
 # HISTORIQUE
 # ======================
-def save_history(data):
-    file = "historique_chantier.csv"
-    exists = os.path.exists(file)
-
-    with open(file, "a", encoding="utf-8") as f:
-        if not exists:
-            f.write("Date,Chantier,Client,Heures,Carburant\n")
-        f.write(",".join(data) + "\n")
-
+def save_history(row):
+    df = pd.DataFrame([row])
+    if os.path.exists(HISTORY_FILE):
+        df.to_csv(HISTORY_FILE, mode="a", header=False, index=False)
+    else:
+        df.to_csv(HISTORY_FILE, index=False)
 
 # ======================
-# PDF GENERATION PRO
+# PDF PRO
 # ======================
 def create_pdf():
 
@@ -87,38 +123,34 @@ def create_pdf():
     styles = getSampleStyleSheet()
     story = []
 
-    # TITRE
-    story.append(Paragraph("RAPPORT CHANTIER V8 BTP", styles["Title"]))
+    story.append(Paragraph("RAPPORT CHANTIER V10 PRO BTP", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    # INFOS
     story.append(Paragraph(f"Date : {date_chantier}", styles["Normal"]))
     story.append(Paragraph(f"Chantier : {chantier}", styles["Normal"]))
     story.append(Paragraph(f"Client : {client}", styles["Normal"]))
-    story.append(Paragraph(f"Engins : {engins}", styles["Normal"]))
+    story.append(Paragraph(f"Engins : {', '.join(engin_selectionne)}", styles["Normal"]))
     story.append(Paragraph(f"Carburant : {carburant} L", styles["Normal"]))
-    story.append(Paragraph(f"GPS : {gps_lat}, {gps_lon}", styles["Normal"]))
-    story.append(Paragraph(f"Temps total : {round(total_heures,2)} h", styles["Normal"]))
+    story.append(Paragraph(f"Heures : {round(total_heures,2)} h", styles["Normal"]))
 
     story.append(Spacer(1, 10))
 
     # PHOTOS
     if photos:
         story.append(Paragraph("📸 Photos chantier", styles["Heading2"]))
-
         for i, p in enumerate(photos):
             img = PILImage.open(p)
-            img_path = f"photo_{i}.png"
-            img.save(img_path)
-
-            story.append(Image(img_path, width=300, height=200))
-            story.append(Spacer(1, 10))
+            path = f"photo_{i}.png"
+            img.save(path)
+            story.append(Image(path, width=300, height=200))
 
     # SIGNATURE
     if signature.image_data is not None:
+        sig = PILImage.fromarray(signature.image_data)
         sig_path = "signature.png"
-        PILImage.fromarray(signature.image_data).save(sig_path)
+        sig.save(sig_path)
 
+        story.append(Spacer(1, 10))
         story.append(Paragraph("✍️ Signature ouvrier", styles["Heading2"]))
         story.append(Image(sig_path, width=200, height=80))
 
@@ -127,33 +159,51 @@ def create_pdf():
 
 
 # ======================
+# EXPORT EXCEL
+# ======================
+def export_excel():
+    if os.path.exists(HISTORY_FILE):
+        df = pd.read_csv(HISTORY_FILE)
+        excel_file = "historique.xlsx"
+        df.to_excel(excel_file, index=False)
+        return excel_file
+    return None
+
+
+# ======================
 # GENERATION
 # ======================
-if st.button("📄 Générer PDF V8 BTP"):
+if st.button("📄 Générer rapport V10"):
 
     pdf = create_pdf()
 
-    save_history([
-        str(date_chantier),
-        chantier,
-        client,
-        str(round(total_heures,2)),
-        carburant
-    ])
+    save_history({
+        "Date": str(date_chantier),
+        "Chantier": chantier,
+        "Client": client,
+        "Engins": ",".join(engin_selectionne),
+        "Heures": round(total_heures,2),
+        "Carburant": carburant
+    })
 
-    st.success("✔ PDF généré + sauvegardé")
+    st.success("✔ Rapport généré")
 
     with open(pdf, "rb") as f:
-        st.download_button("📥 Télécharger PDF", f, file_name="chantier_v8_btp.pdf")
-
+        st.download_button("📥 Télécharger PDF", f, file_name="chantier_v10.pdf")
 
 # ======================
-# HISTORIQUE
+# HISTORIQUE APP
 # ======================
 st.markdown("---")
 st.subheader("📊 Historique chantier")
 
-if os.path.exists("historique_chantier.csv"):
-    st.text(open("historique_chantier.csv").read())
+if os.path.exists(HISTORY_FILE):
+    df = pd.read_csv(HISTORY_FILE)
+    st.dataframe(df)
+
+    excel = export_excel()
+    if excel:
+        with open(excel, "rb") as f:
+            st.download_button("📥 Export Excel", f, file_name="historique.xlsx")
 else:
-    st.info("Aucun historique")
+    st.info("Aucun historique pour le moment")
