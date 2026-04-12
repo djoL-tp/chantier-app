@@ -7,18 +7,22 @@ from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
 from openpyxl import Workbook, load_workbook
+
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-st.set_page_config(page_title="V13 PRO MAX ULTRA", layout="wide")
-st.title("📋 Chantier V13 PRO MAX ULTRA")
+st.set_page_config(page_title="V14 PRO MAX", layout="wide")
+st.title("📋 Chantier V14 PRO MAX STABLE")
 
 # -------------------------
-# ☁️ FIREBASE (SAFE INIT)
+# ☁️ FIREBASE FIX COMPLET
 # -------------------------
 if not firebase_admin._apps:
-    cred = credentials.ApplicationDefault()
-    firebase_admin.initialize_app(cred)
+    cred = credentials.Certificate("data/serviceAccountKey.json")
+
+    firebase_admin.initialize_app(cred, {
+        "projectId": chantier-app-40475
+    })
 
 db = firestore.client()
 
@@ -42,7 +46,7 @@ localisation = st.text_input("📍 Localisation")
 # -------------------------
 # 🚜 ENGIN
 # -------------------------
-engin = st.text_input("🚜 Engin")
+engin = st.text_input("🚜 Engin utilisé")
 
 # -------------------------
 # 🧾 TRAVAIL
@@ -79,20 +83,6 @@ def fmt(d):
 total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
 
 st.write("🕒 Total :", fmt(total))
-
-# -------------------------
-# 📸 PHOTOS
-# -------------------------
-st.subheader("📸 Photos chantier")
-
-photos = st.file_uploader("Ajouter photos", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
-
-legendes = []
-
-if photos:
-    for i, p in enumerate(photos):
-        leg = st.text_input(f"Légende photo {i+1}", key=i)
-        legendes.append(leg)
 
 # -------------------------
 # ✍️ SIGNATURE
@@ -146,10 +136,10 @@ if st.button("💾 ENREGISTRER"):
     with open("historique.json", "w") as f:
         json.dump(historique, f, indent=4)
 
-    # CLOUD FIRESTORE
+    # CLOUD FIREBASE
     db.collection("chantiers").add(data)
 
-    st.success("Sauvegarde OK ☁️ + local")
+    st.success("Sauvegarde OK ☁️ + LOCAL")
 
 # -------------------------
 # 📄 PDF
@@ -159,7 +149,7 @@ def pdf():
     styles = getSampleStyleSheet()
     e = []
 
-    e.append(Paragraph("RAPPORT CHANTIER V13 ULTRA", styles["Title"]))
+    e.append(Paragraph("RAPPORT CHANTIER V14 PRO MAX", styles["Title"]))
     e.append(Spacer(1, 20))
 
     e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
@@ -175,21 +165,6 @@ def pdf():
     if signature_path:
         e.append(Spacer(1, 20))
         e.append(Image(signature_path, width=200, height=100))
-
-    if photos:
-        e.append(Spacer(1, 20))
-        e.append(Paragraph("Photos :", styles["Heading2"]))
-
-        for i, p in enumerate(photos):
-            img = PILImage.open(p)
-            img.thumbnail((800, 800))
-            path = f"p{i}.jpg"
-            img.save(path)
-
-            e.append(Image(path, width=300, height=200))
-
-            if i < len(legendes):
-                e.append(Paragraph(legendes[i], styles["Normal"]))
 
     doc.build(e)
 
@@ -245,7 +220,7 @@ if st.button("📊 EXCEL"):
 # -------------------------
 # ☁️ CLOUD VIEW
 # -------------------------
-st.subheader("☁️ Cloud")
+st.subheader("☁️ Cloud Firebase")
 
 docs = db.collection("chantiers").stream()
 
