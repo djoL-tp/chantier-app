@@ -9,18 +9,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image as PILImage
 
-from supabase import create_client
+from openpyxl import Workbook, load_workbook
 
-# -------------------------
-# ☁️ SUPABASE INIT
-# -------------------------
-SUPABASE_URL = "https://XXXX.supabase.co"
-SUPABASE_KEY = "TON_ANON_KEY"
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-st.set_page_config(page_title="V16 PRO MAX", layout="wide")
-st.title("📋 Chantier V16 PRO MAX SUPABASE")
+st.set_page_config(page_title="V17 PRO MAX CLEAN", layout="wide")
+st.title("📋 Chantier V17 PRO MAX (STABLE)")
 
 # -------------------------
 # 📅 DATE
@@ -29,9 +21,9 @@ date_jour = datetime.now().strftime("%d/%m/%Y")
 st.write("📅 Date :", date_jour)
 
 # -------------------------
-# 📍 CHANTIER
+# 📍 CHANTIER (manuel uniquement)
 # -------------------------
-chantier = st.text_input("🏗 Chantier")
+chantier = st.text_input("🏗 Chantier (saisie manuelle)")
 
 # -------------------------
 # 🌍 LOCALISATION
@@ -39,9 +31,9 @@ chantier = st.text_input("🏗 Chantier")
 localisation = st.text_input("📍 Localisation")
 
 # -------------------------
-# 🚜 ENGIN
+# 🚜 ENGIN (ligne libre comme demandé)
 # -------------------------
-engin = st.text_input("🚜 Engin utilisé")
+engin = st.text_input("🚜 Engin utilisé (ligne libre)")
 
 # -------------------------
 # 🧾 TRAVAIL
@@ -49,7 +41,7 @@ engin = st.text_input("🚜 Engin utilisé")
 travail = st.text_area("🧾 Travail effectué")
 
 # -------------------------
-# ⏱ HORAIRES
+# ⏱ HORAIRES (simple)
 # -------------------------
 col1, col2 = st.columns(2)
 
@@ -82,6 +74,8 @@ st.write("🕒 Total :", fmt(total))
 # -------------------------
 # ✍️ SIGNATURE
 # -------------------------
+st.subheader("✍️ Signature")
+
 canvas = st_canvas(
     stroke_width=3,
     stroke_color="black",
@@ -102,7 +96,7 @@ if canvas.image_data is not None:
 # -------------------------
 # 📸 PHOTOS
 # -------------------------
-st.subheader("📸 Photos chantier")
+st.subheader("📸 Photos")
 
 photos = st.file_uploader(
     "Ajouter photos",
@@ -131,11 +125,10 @@ data = {
 }
 
 # -------------------------
-# 💾 SAVE SUPABASE + LOCAL
+# 💾 SAUVEGARDE LOCALE UNIQUEMENT (ULTRA STABLE)
 # -------------------------
-if st.button("💾 ENREGISTRER CLOUD"):
+if st.button("💾 ENREGISTRER"):
 
-    # LOCAL BACKUP
     historique = []
 
     if os.path.exists("historique.json"):
@@ -147,10 +140,7 @@ if st.button("💾 ENREGISTRER CLOUD"):
     with open("historique.json", "w") as f:
         json.dump(historique, f, indent=4)
 
-    # CLOUD SUPABASE
-    supabase.table("chantiers").insert(data).execute()
-
-    st.success("Sauvegarde cloud + local OK ☁️")
+    st.success("Sauvegarde OK ✔ (local sécurisé)")
 
 # -------------------------
 # 📄 PDF
@@ -160,7 +150,7 @@ def pdf():
     styles = getSampleStyleSheet()
     e = []
 
-    e.append(Paragraph("RAPPORT CHANTIER V16 PRO MAX", styles["Title"]))
+    e.append(Paragraph("RAPPORT CHANTIER V17 PRO MAX", styles["Title"]))
     e.append(Spacer(1, 20))
 
     e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
@@ -184,7 +174,7 @@ def pdf():
         for i, p in enumerate(photos):
             img = PILImage.open(p)
             img.thumbnail((800, 800))
-            path = f"p{i}.jpg"
+            path = f"photo_{i}.jpg"
             img.save(path)
 
             e.append(Image(path, width=300, height=200))
@@ -235,19 +225,16 @@ if st.button("📊 EXCEL"):
         to_decimal(data["heures"])
     ])
 
-    ws["G1"] = "TOTAL"
-    ws["G2"] = f"=SUM(F2:F{ws.max_row})"
-
     wb.save(file)
 
     with open(file, "rb") as f:
         st.download_button("Télécharger Excel", f, "chantier.xlsx")
 
 # -------------------------
-# ☁️ CLOUD VIEW
+# 📂 HISTORIQUE
 # -------------------------
-st.subheader("☁️ Historique Cloud")
+st.subheader("📂 Historique local")
 
-res = supabase.table("chantiers").select("*").execute()
-
-st.write(res.data)
+if os.path.exists("historique.json"):
+    with open("historique.json", "r") as f:
+        st.write(json.load(f))
