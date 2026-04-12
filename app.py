@@ -214,3 +214,34 @@ if os.path.exists("historique.json"):
 
     st.subheader("📊 Historique")
     st.write(historique)
+    # -------------------------
+# 🗑 SUPPRESSION HISTORIQUE
+# -------------------------
+st.subheader("🗑 Gestion historique")
+
+if os.path.exists("historique.json"):
+    with open("historique.json", "r") as f:
+        historique = json.load(f)
+
+    st.write(f"Nombre d’entrées : {len(historique)}")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🗑 Supprimer tout l’historique"):
+            st.session_state["confirm_delete"] = True
+
+    if st.session_state.get("confirm_delete", False):
+        st.warning("⚠ Tu es sur le point de supprimer tout l’historique")
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            if st.button("❌ Annuler"):
+                st.session_state["confirm_delete"] = False
+
+        with col4:
+            if st.button("✅ Confirmer suppression"):
+                os.remove("historique.json")
+                st.success("Historique supprimé ✅")
+                st.session_state["confirm_delete"] = False
