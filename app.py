@@ -21,7 +21,7 @@ if not firebase_admin._apps:
     cred = credentials.Certificate("data/serviceAccountKey.json")
 
     firebase_admin.initialize_app(cred, {
-        "projectId": chantier-app-40475
+        chantier-app: chantier-app-40475
     })
 
 db = firestore.client()
