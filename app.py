@@ -12,16 +12,22 @@ from PIL import Image as PILImage
 from openpyxl import Workbook, load_workbook
 
 st.set_page_config(page_title="V17 PRO MAX CLEAN", layout="wide")
-st.title("📋 Chantier V17 PRO MAX (STABLE)")
+st.title("📋 Chantier V17 PRO MAX (CLEAN)")
 
 # -------------------------
-# 📅 DATE
+# 📅 DATE MANUELLE
 # -------------------------
-date_jour = datetime.now().strftime("%d/%m/%Y")
-st.write("📅 Date :", date_jour)
+st.subheader("📅 Date du chantier")
+
+date_jour = st.date_input(
+    "Choisir la date",
+    value=datetime.now()
+).strftime("%d/%m/%Y")
+
+st.write("📅 Date sélectionnée :", date_jour)
 
 # -------------------------
-# 📍 CHANTIER (manuel uniquement)
+# 📍 CHANTIER
 # -------------------------
 chantier = st.text_input("🏗 Chantier (saisie manuelle)")
 
@@ -31,7 +37,7 @@ chantier = st.text_input("🏗 Chantier (saisie manuelle)")
 localisation = st.text_input("📍 Localisation")
 
 # -------------------------
-# 🚜 ENGIN (ligne libre comme demandé)
+# 🚜 ENGIN
 # -------------------------
 engin = st.text_input("🚜 Engin utilisé (ligne libre)")
 
@@ -41,7 +47,7 @@ engin = st.text_input("🚜 Engin utilisé (ligne libre)")
 travail = st.text_area("🧾 Travail effectué")
 
 # -------------------------
-# ⏱ HORAIRES (simple)
+# ⏱ HORAIRES
 # -------------------------
 col1, col2 = st.columns(2)
 
@@ -59,182 +65,4 @@ def calc(d1, d2):
         a = datetime.combine(datetime.today(), d1)
         b = datetime.combine(datetime.today(), d2)
         if b > a:
-            return b - a
-    return timedelta(0)
-
-
-def fmt(d):
-    return f"{d.seconds//3600}h{(d.seconds%3600)//60:02d}"
-
-
-total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
-
-st.write("🕒 Total :", fmt(total))
-
-# -------------------------
-# ✍️ SIGNATURE
-# -------------------------
-st.subheader("✍️ Signature")
-
-canvas = st_canvas(
-    stroke_width=3,
-    stroke_color="black",
-    background_color="white",
-    height=150,
-    width=400,
-    drawing_mode="freedraw",
-    key="sig"
-)
-
-signature_path = None
-
-if canvas.image_data is not None:
-    img = PILImage.fromarray(canvas.image_data.astype("uint8"))
-    signature_path = "signature.png"
-    img.save(signature_path)
-
-# -------------------------
-# 📸 PHOTOS
-# -------------------------
-st.subheader("📸 Photos")
-
-photos = st.file_uploader(
-    "Ajouter photos",
-    type=["jpg", "jpeg", "png"],
-    accept_multiple_files=True
-)
-
-legendes = []
-
-if photos:
-    for i, p in enumerate(photos):
-        leg = st.text_input(f"Légende photo {i+1}", key=f"leg{i}")
-        legendes.append(leg)
-
-# -------------------------
-# 📦 DATA
-# -------------------------
-data = {
-    "date": date_jour,
-    "chantier": chantier,
-    "localisation": localisation,
-    "engin": engin,
-    "travail": travail,
-    "heures": fmt(total),
-    "timestamp": datetime.now().isoformat()
-}
-
-# -------------------------
-# 💾 SAUVEGARDE LOCALE UNIQUEMENT (ULTRA STABLE)
-# -------------------------
-if st.button("💾 ENREGISTRER"):
-
-    historique = []
-
-    if os.path.exists("historique.json"):
-        with open("historique.json", "r") as f:
-            historique = json.load(f)
-
-    historique.append(data)
-
-    with open("historique.json", "w") as f:
-        json.dump(historique, f, indent=4)
-
-    st.success("Sauvegarde OK ✔ (local sécurisé)")
-
-# -------------------------
-# 📄 PDF
-# -------------------------
-def pdf():
-    doc = SimpleDocTemplate("rapport.pdf")
-    styles = getSampleStyleSheet()
-    e = []
-
-    e.append(Paragraph("RAPPORT CHANTIER V17 PRO MAX", styles["Title"]))
-    e.append(Spacer(1, 20))
-
-    e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
-    e.append(Paragraph(f"Chantier : {data['chantier']}", styles["Normal"]))
-    e.append(Paragraph(f"Localisation : {data['localisation']}", styles["Normal"]))
-    e.append(Paragraph(f"Engin : {data['engin']}", styles["Normal"]))
-    e.append(Paragraph(f"Heures : {data['heures']}", styles["Normal"]))
-
-    e.append(Spacer(1, 10))
-    e.append(Paragraph("Travail :", styles["Heading2"]))
-    e.append(Paragraph(data["travail"], styles["Normal"]))
-
-    if signature_path:
-        e.append(Spacer(1, 20))
-        e.append(Image(signature_path, width=200, height=100))
-
-    if photos:
-        e.append(Spacer(1, 20))
-        e.append(Paragraph("Photos :", styles["Heading2"]))
-
-        for i, p in enumerate(photos):
-            img = PILImage.open(p)
-            img.thumbnail((800, 800))
-            path = f"photo_{i}.jpg"
-            img.save(path)
-
-            e.append(Image(path, width=300, height=200))
-
-            if i < len(legendes):
-                e.append(Paragraph(legendes[i], styles["Normal"]))
-
-    doc.build(e)
-
-# -------------------------
-# 📄 DOWNLOAD PDF
-# -------------------------
-if st.button("📄 PDF"):
-    pdf()
-    with open("rapport.pdf", "rb") as f:
-        st.download_button("Télécharger PDF", f, "rapport.pdf")
-
-# -------------------------
-# 📊 EXCEL
-# -------------------------
-def to_decimal(h):
-    try:
-        a, b = h.split("h")
-        return float(a) + float(b)/60
-    except:
-        return 0
-
-
-if st.button("📊 EXCEL"):
-
-    file = "chantier.xlsx"
-
-    if not os.path.exists(file):
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["Date", "Chantier", "Localisation", "Engin", "Travail", "Heures"])
-        wb.save(file)
-
-    wb = load_workbook(file)
-    ws = wb.active
-
-    ws.append([
-        data["date"],
-        data["chantier"],
-        data["localisation"],
-        data["engin"],
-        data["travail"],
-        to_decimal(data["heures"])
-    ])
-
-    wb.save(file)
-
-    with open(file, "rb") as f:
-        st.download_button("Télécharger Excel", f, "chantier.xlsx")
-
-# -------------------------
-# 📂 HISTORIQUE
-# -------------------------
-st.subheader("📂 Historique local")
-
-if os.path.exists("historique.json"):
-    with open("historique.json", "r") as f:
-        st.write(json.load(f))
+           
