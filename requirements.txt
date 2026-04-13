@@ -1,6 +1,5 @@
 streamlit
 pandas
-fpdf
 Pillow
 reportlab
 streamlit-drawable-canvas
