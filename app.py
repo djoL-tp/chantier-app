@@ -11,12 +11,12 @@ st.set_page_config(page_title="V17 PRO MAX", layout="centered")
 if "data" not in st.session_state:
     st.session_state.data = []
 
-# ------------------------
-# UI
-# ------------------------
 st.title("📋 V17 PRO MAX")
 
-with st.form("formulaire"):
+# ------------------------
+# FORMULAIRE
+# ------------------------
+with st.form("formulaire", clear_on_submit=True):
 
     date = st.date_input("📅 Date", datetime.today())
     ouvrier = st.text_input("👷 Ouvrier")
@@ -26,6 +26,11 @@ with st.form("formulaire"):
     description = st.text_area("📝 Description")
 
     submit = st.form_submit_button("Enregistrer")
+
+# ------------------------
+# DEBUG
+# ------------------------
+st.write("📦 Données actuelles :", st.session_state.data)
 
 # ------------------------
 # SAVE
@@ -51,14 +56,17 @@ if submit:
 
         st.success("✅ Enregistré")
 
+        # 👉 FORCE LE REFRESH
+        st.rerun()
+
 # ------------------------
-# HISTORIQUE + PDF
+# HISTORIQUE
 # ------------------------
 if len(st.session_state.data) > 0:
 
-    df = pd.DataFrame(st.session_state.data)
-
     st.subheader("📊 Historique")
+
+    df = pd.DataFrame(st.session_state.data)
     st.dataframe(df, use_container_width=True)
 
     # ------------------------
@@ -80,13 +88,10 @@ if len(st.session_state.data) > 0:
             pdf.cell(0, 10, f"Date : {row['date']}", ln=True)
             pdf.cell(0, 10, f"Ouvrier : {row['ouvrier']}", ln=True)
             pdf.cell(0, 10, f"Chantier : {row['chantier']}", ln=True)
-
-            # ✅ AMPLITUDE ICI
             pdf.cell(0, 10, f"Amplitude : {amplitude}", ln=True)
-
             pdf.cell(0, 10, f"Duree : {row['duree']} h", ln=True)
             pdf.multi_cell(0, 10, f"Description : {row['description']}")
-            pdf.cell(0, 10, "---------------------------", ln=True)
+            pdf.cell(0, 10, "----------------------", ln=True)
 
         pdf.output("rapport.pdf")
 
