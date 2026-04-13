@@ -1,307 +1,117 @@
 import streamlit as st
-from datetime import datetime, timedelta
-import json
-import os
+from datetime import datetime
 import pandas as pd
+from fpdf import FPDF
 
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet
+st.set_page_config(page_title="V17 PRO MAX BTP", layout="centered")
 
-from streamlit_drawable_canvas import st_canvas
-from PIL import Image as PILImage
+# ------------------------
+# INITIALISATION
+# ------------------------
+if "data" not in st.session_state:
+    st.session_state.data = []
 
-from openpyxl import Workbook, load_workbook
+# ------------------------
+# TITRE
+# ------------------------
+st.title("📋 Rapport Chantier V17 PRO MAX")
 
+# ------------------------
+# FORMULAIRE
+# ------------------------
+with st.form("formulaire"):
 
-# =========================
-# 📱 MOBILE OPTIMISÉ
-# =========================
-st.set_page_config(
-    page_title="V17 PRO MAX",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+    date = st.date_input("📅 Date", datetime.today())
 
-st.markdown("""
-<style>
-@media (max-width: 768px){
-    .block-container{
-        padding: 10px !important;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
+    ouvrier = st.text_input("👷 Ouvrier")
+    chantier = st.text_input("🏗️ Chantier")
 
+    heure_debut = st.time_input("⏰ Heure début")
+    heure_fin = st.time_input("⏰ Heure fin")
 
-st.title("📋 CHANTIER V17 PRO MAX")
+    description = st.text_area("📝 Description")
 
+    submit = st.form_submit_button("Enregistrer")
 
-# =========================
-# 📂 HISTORIQUE
-# =========================
-file_json = "historique.json"
+# ------------------------
+# ENREGISTREMENT
+# ------------------------
+if submit:
 
-if os.path.exists(file_json):
-    with open(file_json, "r") as f:
-        historique = json.load(f)
-else:
-    historique = []
+    debut = datetime.combine(date, heure_debut)
+    fin = datetime.combine(date, heure_fin)
 
+    duree = (fin - debut).total_seconds() / 3600
 
-# =========================
-# 📅 DATE FR
-# =========================
-st.subheader("📅 Date du chantier")
+    st.session_state.data.append({
+        "date": date.strftime("%d/%m/%Y"),
+        "ouvrier": ouvrier,
+        "chantier": chantier,
+        "debut": heure_debut.strftime("%H:%M"),
+        "fin": heure_fin.strftime("%H:%M"),
+        "duree": round(duree, 2),
+        "description": description
+    })
 
-date_obj = st.date_input("Choisir la date", value=datetime.now())
+    st.success("✅ Enregistré")
 
-jours = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"]
-mois = ["janvier","février","mars","avril","mai","juin","juillet","août",
-        "septembre","octobre","novembre","décembre"]
+# ------------------------
+# AFFICHAGE TABLEAU
+# ------------------------
+if st.session_state.data:
 
-date_jour = f"{jours[date_obj.weekday()]} {date_obj.day} {mois[date_obj.month-1]} {date_obj.year}"
+    df = pd.DataFrame(st.session_state.data)
 
-st.write("📅", date_jour)
+    st.subheader("📊 Historique")
+    st.dataframe(df, use_container_width=True)
 
+    # ------------------------
+    # STATS
+    # ------------------------
+    df["date_dt"] = pd.to_datetime(df["date"], format="%d/%m/%Y")
 
-# =========================
-# 🏗 DONNÉES
-# =========================
-chantier = st.text_input("🏗 Chantier")
-localisation = st.text_input("📍 Localisation")
-engin = st.text_input("🚜 Engin")
-travail = st.text_area("🧾 Travail")
+    semaine = df[df["date_dt"] >= pd.Timestamp.today() - pd.Timedelta(days=7)]
+    mois = df[df["date_dt"] >= pd.Timestamp.today() - pd.Timedelta(days=30)]
 
+    st.subheader("📈 Statistiques")
 
-# =========================
-# ⏱ HORAIRES
-# =========================
-col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-with col1:
-    debut_matin = st.time_input("Début matin")
-    fin_matin = st.time_input("Fin matin")
+    col1.metric("🗓️ Heures semaine", f"{semaine['duree'].sum():.2f} h")
+    col2.metric("📅 Heures mois", f"{mois['duree'].sum():.2f} h")
 
-with col2:
-    debut_aprem = st.time_input("Début aprem")
-    fin_aprem = st.time_input("Fin aprem")
+    # ------------------------
+    # PDF
+    # ------------------------
+    if st.button("📄 Générer PDF"):
 
+        pdf = FPDF()
+        pdf.add_page()
 
-def calc(d1, d2):
-    if d1 and d2:
-        a = datetime.combine(datetime.today(), d1)
-        b = datetime.combine(datetime.today(), d2)
-        if b > a:
-            return b - a
-    return timedelta(0)
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(0, 10, "Rapport Chantier", ln=True)
 
+        pdf.set_font("Arial", "", 12)
 
-def fmt(td):
-    return f"{td.seconds//3600}h{(td.seconds%3600)//60:02d}"
+        for row in st.session_state.data:
 
+            # AMPLITUDE HORAIRE
+            amplitude = f"{row['debut']} → {row['fin']}"
 
-total = calc(debut_matin, fin_matin) + calc(debut_aprem, fin_aprem)
+            pdf.ln(5)
+            pdf.cell(0, 10, f"Date : {row['date']}", ln=True)
+            pdf.cell(0, 10, f"Ouvrier : {row['ouvrier']}", ln=True)
+            pdf.cell(0, 10, f"Chantier : {row['chantier']}", ln=True)
 
-st.write("🕒 Total :", fmt(total))
+            # 👉 ICI TA NOUVELLE LIGNE DEMANDÉE
+            pdf.cell(0, 10, f"Amplitude : {amplitude}", ln=True)
 
+            pdf.cell(0, 10, f"Durée : {row['duree']} h", ln=True)
 
-# =========================
-# ✍️ SIGNATURE
-# =========================
-st.subheader("✍️ Signature")
+            pdf.multi_cell(0, 10, f"Description : {row['description']}")
+            pdf.cell(0, 10, "-"*40, ln=True)
 
-canvas = st_canvas(
-    stroke_width=3,
-    stroke_color="black",
-    background_color="white",
-    height=150,
-    width=400,
-    drawing_mode="freedraw",
-    key="sig"
-)
+        pdf.output("rapport.pdf")
 
-signature_path = None
-
-if canvas.image_data is not None:
-    img = PILImage.fromarray(canvas.image_data.astype("uint8"))
-    signature_path = "signature.png"
-    img.save(signature_path)
-
-
-# =========================
-# 📸 PHOTOS
-# =========================
-st.subheader("📸 Photos")
-
-photos = st.file_uploader(
-    "Ajouter photos",
-    type=["jpg","jpeg","png"],
-    accept_multiple_files=True
-)
-
-legendes = []
-
-if photos:
-    for i, p in enumerate(photos):
-        leg = st.text_input(f"Légende {i+1}", key=f"leg{i}")
-        legendes.append(leg)
-
-
-# =========================
-# 📦 DATA
-# =========================
-data = {
-    "date": date_jour,
-    "chantier": chantier,
-    "localisation": localisation,
-    "engin": engin,
-    "travail": travail,
-    "heures": fmt(total),
-    "timestamp": datetime.now().isoformat()
-}
-
-
-# =========================
-# 💾 SAUVEGARDE
-# =========================
-if st.button("💾 ENREGISTRER"):
-    historique.append(data)
-
-    with open(file_json, "w") as f:
-        json.dump(historique, f, indent=4)
-
-    st.success("Sauvegarde OK ✔")
-    st.rerun()
-
-
-# =========================
-# 📊 STATISTIQUES
-# =========================
-st.subheader("📊 Statistiques")
-
-if historique:
-
-    df = pd.DataFrame(historique)
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-
-    def to_decimal(h):
-        try:
-            a,b = h.split("h")
-            return float(a)+float(b)/60
-        except:
-            return 0
-
-    df["heures_num"] = df["heures"].apply(to_decimal)
-
-    df["semaine"] = df["date"].dt.isocalendar().week
-    st.write("📅 Heures/semaine")
-    st.bar_chart(df.groupby("semaine")["heures_num"].sum())
-
-    df["mois"] = df["date"].dt.to_period("M").astype(str)
-    st.write("📆 Heures/mois")
-    st.bar_chart(df.groupby("mois")["heures_num"].sum())
-
-else:
-    st.info("Aucune donnée")
-
-
-# =========================
-# 📄 PDF
-# =========================
-def generate_pdf():
-
-    doc = SimpleDocTemplate("rapport.pdf")
-    styles = getSampleStyleSheet()
-    e = []
-
-    e.append(Paragraph("RAPPORT CHANTIER V17 PRO MAX", styles["Title"]))
-    e.append(Spacer(1, 20))
-
-    e.append(Paragraph(f"Date : {data['date']}", styles["Normal"]))
-    e.append(Paragraph(f"Chantier : {data['chantier']}", styles["Normal"]))
-    e.append(Paragraph(f"Localisation : {data['localisation']}", styles["Normal"]))
-    e.append(Paragraph(f"Engin : {data['engin']}", styles["Normal"]))
-    e.append(Paragraph(f"Heures : {data['heures']}", styles["Normal"]))
-
-    e.append(Spacer(1, 10))
-    e.append(Paragraph("Travail :", styles["Heading2"]))
-    e.append(Paragraph(data["travail"], styles["Normal"]))
-
-    if signature_path:
-        e.append(Spacer(1, 20))
-        e.append(Image(signature_path, width=200, height=100))
-
-    if photos:
-        e.append(Spacer(1, 20))
-        e.append(Paragraph("Photos :", styles["Heading2"]))
-
-        for i,p in enumerate(photos):
-            img = PILImage.open(p)
-            img.thumbnail((800,800))
-            path = f"p{i}.jpg"
-            img.save(path)
-            e.append(Image(path, width=300, height=200))
-
-            if i < len(legendes):
-                e.append(Paragraph(legendes[i], styles["Normal"]))
-
-    doc.build(e)
-
-
-if st.button("📄 PDF"):
-    generate_pdf()
-    with open("rapport.pdf","rb") as f:
-        st.download_button("Télécharger PDF", f, "rapport.pdf")
-
-
-# =========================
-# 📊 EXCEL
-# =========================
-def to_decimal(h):
-    try:
-        a,b=h.split("h")
-        return float(a)+float(b)/60
-    except:
-        return 0
-
-
-if st.button("📊 EXCEL"):
-
-    file="chantier.xlsx"
-
-    if not os.path.exists(file):
-        wb=Workbook()
-        ws=wb.active
-        ws.append(["Date","Chantier","Localisation","Engin","Travail","Heures"])
-        wb.save(file)
-
-    wb=load_workbook(file)
-    ws=wb.active
-
-    ws.append([
-        data["date"],
-        data["chantier"],
-        data["localisation"],
-        data["engin"],
-        data["travail"],
-        to_decimal(data["heures"])
-    ])
-
-    wb.save(file)
-
-    with open(file,"rb") as f:
-        st.download_button("Télécharger Excel", f, "chantier.xlsx")
-
-
-# =========================
-# 📂 HISTORIQUE + SUPPRESSION
-# =========================
-st.subheader("📂 Historique")
-
-st.write(historique)
-
-if st.button("🧹 Effacer historique"):
-    if os.path.exists(file_json):
-        os.remove(file_json)
-    st.success("Supprimé ✔")
-    st.rerun()
+        with open("rapport.pdf", "rb") as f:
+            st.download_button("📥 Télécharger PDF", f, file_name="rapport.pdf")
