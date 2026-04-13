@@ -65,14 +65,14 @@ travail = st.text_area("🧾 Travail effectué")
 h_matin = st.number_input("Heures matin", 0.0, 12.0, step=0.5)
 h_aprem = st.number_input("Heures après-midi", 0.0, 12.0, step=0.5)
 
-total = h_matin + h_aprem
+total = float(h_matin) + float(h_aprem)
 st.write("🕒 Total :", total, "h")
 
 # =========================
-# 💾 SAUVEGARDE
+# 💾 SAUVEGARDE SAFE
 # =========================
-def save():
-    entry = {
+def save_entry():
+    return {
         "date": date_jour,
         "ouvrier": ouvrier,
         "chantier": chantier,
@@ -83,42 +83,51 @@ def save():
         "total": total
     }
 
-    historique.append(entry)
-
-    with open(FILE, "w") as f:
-        json.dump(historique, f, indent=4)
-
-    return entry
-
 if st.button("💾 ENREGISTRER"):
     if ouvrier and chantier:
-        save()
+        historique.append(save_entry())
+
+        with open(FILE, "w") as f:
+            json.dump(historique, f, indent=4)
+
         st.success("Sauvegardé ✔")
         st.rerun()
     else:
-        st.warning("Remplis Ouvrier + Chantier")
+        st.warning("⚠ Remplis Ouvrier + Chantier")
 
 # =========================
-# 📊 TABLEAU
+# 📊 DATAFRAME ANTI-CRASH
 # =========================
 df = pd.DataFrame(historique)
+
+# 🔥 sécurisation totale colonnes
+cols = ["date","ouvrier","chantier","engin","travail","matin","aprem","total"]
+
+for c in cols:
+    if c not in df.columns:
+        df[c] = 0 if c == "total" else ""
+
+# conversion safe
+df["total"] = pd.to_numeric(df["total"], errors="coerce").fillna(0)
+
 st.dataframe(df, use_container_width=True)
 
 # =========================
-# 📊 STATS
+# 📊 STATS SAFE
 # =========================
 if not df.empty:
     st.subheader("📊 Statistiques")
-    st.metric("Total heures", df["total"].sum())
-    st.metric("Moyenne", round(df["total"].mean(), 2))
+
+    st.metric("Total heures", float(df["total"].sum()))
+    st.metric("Moyenne", round(float(df["total"].mean()), 2))
 
 # =========================
-# 📄 PDF CLEAN
+# 📄 PDF STABLE
 # =========================
 class PDF(FPDF):
     def header(self):
         self.set_font("Arial", "B", 12)
-        self.cell(0, 10, "RAPPORT CHANTIER V17 MOBILE PRO MAX", ln=True, align="C")
+        self.cell(0, 10, "V17 MOBILE PRO MAX", ln=True, align="C")
         self.ln(5)
 
 def export_pdf(dataframe):
@@ -143,12 +152,10 @@ def export_pdf(dataframe):
     pdf.output(file)
     return file
 
-# =========================
-# 📄 EXPORT PDF
-# =========================
 if not df.empty:
     if st.button("📄 PDF"):
         file = export_pdf(df)
+
         with open(file, "rb") as f:
             st.download_button("Télécharger PDF", f, file_name="rapport.pdf")
 
@@ -185,7 +192,7 @@ if st.button("📊 EXCEL"):
         st.download_button("Télécharger Excel", f, file_name="chantier.xlsx")
 
 # =========================
-# 🧹 RESET
+# 🧹 RESET SAFE
 # =========================
 if st.button("🧹 RESET"):
     historique = []
