@@ -139,7 +139,7 @@ if not df.empty:
     st.metric("Moyenne", round(float(df["total"].mean()), 2))
 
 # =========================
-# 📄 PDF PROPRE
+# 📄 PDF COMPLET
 # =========================
 class PDF(FPDF):
     def header(self):
@@ -161,6 +161,10 @@ def export_pdf(dataframe):
         pdf.cell(0, 7, f"Entreprise / Client : {row['client']}", ln=True)
         pdf.cell(0, 7, f"Chantier : {row['chantier']}", ln=True)
         pdf.cell(0, 7, f"Engin : {row['engin']}", ln=True)
+
+        # 🔥 RETOUR DU TRAVAIL EFFECTUÉ
+        pdf.cell(0, 7, f"Travail effectué : {row['travail']}", ln=True)
+
         pdf.cell(0, 7, f"Matin : {row['matin_debut']} - {row['matin_fin']}", ln=True)
         pdf.cell(0, 7, f"Aprem : {row['aprem_debut']} - {row['aprem_fin']}", ln=True)
         pdf.cell(0, 7, f"Total : {row['total']} h", ln=True)
