@@ -152,7 +152,7 @@ def export_pdf(dataframe):
     pdf.add_page()
     pdf.set_font("Arial", size=10)
 
-    pdf.cell(0, 8, "Amplitude horaire : 08h00 / 12h00 - 13h00 / 17h30", ln=True)
+    pdf.cell(0, 8, "Amplitude horaire : 07h30 / 12h00 - 13h30 / 17h00", ln=True)
     pdf.ln(3)
 
     for _, row in dataframe.iterrows():
