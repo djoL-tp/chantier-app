@@ -64,12 +64,12 @@ st.subheader("⏱ Horaires")
 col1, col2 = st.columns(2)
 
 with col1:
-    matin_debut = st.time_input("Matin début", value=datetime.strptime("08:00", "%H:%M").time())
+    matin_debut = st.time_input("Matin début", value=datetime.strptime("07:30", "%H:%M").time())
     matin_fin = st.time_input("Matin fin", value=datetime.strptime("12:00", "%H:%M").time())
 
 with col2:
-    aprem_debut = st.time_input("Après-midi début", value=datetime.strptime("13:00", "%H:%M").time())
-    aprem_fin = st.time_input("Après-midi fin", value=datetime.strptime("17:30", "%H:%M").time())
+    aprem_debut = st.time_input("Après-midi début", value=datetime.strptime("13:30", "%H:%M").time())
+    aprem_fin = st.time_input("Après-midi fin", value=datetime.strptime("17:00", "%H:%M").time())
 
 def calc_hours(d1, d2):
     t1 = datetime.combine(datetime.today(), d1)
@@ -139,7 +139,7 @@ if not df.empty:
     st.metric("Moyenne", round(float(df["total"].mean()), 2))
 
 # =========================
-# 📄 PDF COMPLET
+# 📄 PDF
 # =========================
 class PDF(FPDF):
     def header(self):
@@ -152,6 +152,7 @@ def export_pdf(dataframe):
     pdf.add_page()
     pdf.set_font("Arial", size=10)
 
+    # 🔥 AMPLITUDE MODIFIÉE
     pdf.cell(0, 8, "Amplitude horaire : 07h30 / 12h00 - 13h30 / 17h00", ln=True)
     pdf.ln(3)
 
@@ -162,7 +163,6 @@ def export_pdf(dataframe):
         pdf.cell(0, 7, f"Chantier : {row['chantier']}", ln=True)
         pdf.cell(0, 7, f"Engin : {row['engin']}", ln=True)
 
-        # 🔥 RETOUR DU TRAVAIL EFFECTUÉ
         pdf.cell(0, 7, f"Travail effectué : {row['travail']}", ln=True)
 
         pdf.cell(0, 7, f"Matin : {row['matin_debut']} - {row['matin_fin']}", ln=True)
