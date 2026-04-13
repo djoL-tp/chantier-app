@@ -2,29 +2,39 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 from fpdf import FPDF
+import io
 
-st.set_page_config(page_title="V17 PRO MAX", layout="centered")
+st.set_page_config(page_title="V17 PRO MAX BTP", layout="centered")
 
 # ------------------------
-# INIT
+# INIT DATA
 # ------------------------
 if "data" not in st.session_state:
     st.session_state.data = []
 
-st.title("📋 V17 PRO MAX")
+st.title("📋 V17 PRO MAX BTP")
 
 # ------------------------
-# INPUTS (SANS FORM)
+# FORMULAIRE
 # ------------------------
 date = st.date_input("📅 Date", datetime.today())
+
 ouvrier = st.text_input("👷 Ouvrier")
+
 chantier = st.text_input("🏗️ Chantier")
-heure_debut = st.time_input("⏰ Heure début")
-heure_fin = st.time_input("⏰ Heure fin")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    heure_debut = st.time_input("⏰ Début matin")
+
+with col2:
+    heure_fin = st.time_input("⏰ Fin journée")
+
 description = st.text_area("📝 Description")
 
 # ------------------------
-# BOUTON SAVE
+# ENREGISTRER
 # ------------------------
 if st.button("💾 Enregistrer"):
 
@@ -32,18 +42,19 @@ if st.button("💾 Enregistrer"):
     fin = datetime.combine(date, heure_fin)
 
     if fin <= debut:
-        st.error("❌ Heure fin invalide")
+        st.error("❌ Heure fin doit être après heure début")
     else:
         duree = (fin - debut).total_seconds() / 3600
 
         st.session_state.data.append({
-            "date": date.strftime("%d/%m/%Y"),
-            "ouvrier": ouvrier,
-            "chantier": chantier,
-            "debut": heure_debut.strftime("%H:%M"),
-            "fin": heure_fin.strftime("%H:%M"),
-            "duree": round(duree, 2),
-            "description": description
+            "Date": date.strftime("%d/%m/%Y"),
+            "Ouvrier": ouvrier,
+            "Chantier": chantier,
+            "Début": heure_debut.strftime("%H:%M"),
+            "Fin": heure_fin.strftime("%H:%M"),
+            "Amplitude": f"{heure_debut.strftime('%H:%M')} → {heure_fin.strftime('%H:%M')}",
+            "Heures": round(duree, 2),
+            "Description": description
         })
 
         st.success("✅ Enregistré")
@@ -59,33 +70,59 @@ if len(st.session_state.data) > 0:
     st.dataframe(df, use_container_width=True)
 
     # ------------------------
+    # STATS
+    # ------------------------
+    st.subheader("📈 Statistiques")
+
+    st.metric("Total heures", f"{df['Heures'].sum():.2f} h")
+
+    # ------------------------
     # PDF
     # ------------------------
-    if st.button("📄 Générer PDF"):
-
+    def generate_pdf(data):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
 
-        pdf.cell(0, 10, "Rapport Chantier", ln=True)
+        pdf.cell(0, 10, "RAPPORT CHANTIER V17 PRO MAX", ln=True)
 
-        for row in st.session_state.data:
-
-            amplitude = f"{row['debut']} → {row['fin']}"
+        for row in data:
 
             pdf.ln(5)
-            pdf.cell(0, 10, f"Date : {row['date']}", ln=True)
-            pdf.cell(0, 10, f"Ouvrier : {row['ouvrier']}", ln=True)
-            pdf.cell(0, 10, f"Chantier : {row['chantier']}", ln=True)
+            pdf.cell(0, 10, f"Date : {row['Date']}", ln=True)
+            pdf.cell(0, 10, f"Ouvrier : {row['Ouvrier']}", ln=True)
+            pdf.cell(0, 10, f"Chantier : {row['Chantier']}", ln=True)
+            pdf.cell(0, 10, f"Amplitude : {row['Amplitude']}", ln=True)
+            pdf.cell(0, 10, f"Heures : {row['Heures']} h", ln=True)
+            pdf.multi_cell(0, 10, f"Description : {row['Description']}")
+            pdf.cell(0, 10, "-"*40, ln=True)
 
-            # ✅ AMPLITUDE OK
-            pdf.cell(0, 10, f"Amplitude : {amplitude}", ln=True)
+        return pdf
 
-            pdf.cell(0, 10, f"Duree : {row['duree']} h", ln=True)
-            pdf.multi_cell(0, 10, f"Description : {row['description']}")
-            pdf.cell(0, 10, "----------------------", ln=True)
+    col1, col2 = st.columns(2)
 
-        pdf.output("rapport.pdf")
+    with col1:
+        if st.button("📄 PDF"):
+            pdf = generate_pdf(st.session_state.data)
+            pdf.output("rapport.pdf")
 
-        with open("rapport.pdf", "rb") as f:
-            st.download_button("📥 Télécharger PDF", f, file_name="rapport.pdf")
+            with open("rapport.pdf", "rb") as f:
+                st.download_button("📥 Télécharger PDF", f, file_name="rapport.pdf")
+
+    # ------------------------
+    # EXCEL
+    # ------------------------
+    with col2:
+        if st.button("📊 Excel"):
+
+            df = pd.DataFrame(st.session_state.data)
+
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Chantier")
+
+            st.download_button(
+                "📥 Télécharger Excel",
+                output.getvalue(),
+                file_name="rapport_chantier.xlsx"
+            )
