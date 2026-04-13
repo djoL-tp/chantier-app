@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, time
+from datetime import datetime
 import json
 import os
 import pandas as pd
@@ -51,31 +51,31 @@ st.write("📅", date_jour)
 # 👷 INPUTS
 # =========================
 ouvrier = st.text_input("👷 Ouvrier")
+client = st.text_input("🏢 Entreprise / Client")
 chantier = st.text_input("🏗 Chantier")
 engin = st.text_input("🚜 Engin")
 travail = st.text_area("🧾 Travail effectué")
 
 # =========================
-# ⏱ HEURES (NOUVEAU SYSTÈME)
+# ⏱ HORAIRES
 # =========================
 st.subheader("⏱ Horaires")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    matin_debut = st.time_input("Matin début", value=time(8,0))
-    matin_fin = st.time_input("Matin fin", value=time(12,0))
+    matin_debut = st.time_input("Matin début", value=datetime.strptime("08:00", "%H:%M").time())
+    matin_fin = st.time_input("Matin fin", value=datetime.strptime("12:00", "%H:%M").time())
 
 with col2:
-    aprem_debut = st.time_input("Après-midi début", value=time(13,0))
-    aprem_fin = st.time_input("Après-midi fin", value=time(17,30))
+    aprem_debut = st.time_input("Après-midi début", value=datetime.strptime("13:00", "%H:%M").time())
+    aprem_fin = st.time_input("Après-midi fin", value=datetime.strptime("17:30", "%H:%M").time())
 
 def calc_hours(d1, d2):
-    if d1 and d2:
-        t1 = datetime.combine(datetime.today(), d1)
-        t2 = datetime.combine(datetime.today(), d2)
-        if t2 > t1:
-            return (t2 - t1).seconds / 3600
+    t1 = datetime.combine(datetime.today(), d1)
+    t2 = datetime.combine(datetime.today(), d2)
+    if t2 > t1:
+        return (t2 - t1).seconds / 3600
     return 0
 
 total = calc_hours(matin_debut, matin_fin) + calc_hours(aprem_debut, aprem_fin)
@@ -89,6 +89,7 @@ def save_entry():
     return {
         "date": date_jour,
         "ouvrier": ouvrier,
+        "client": client,
         "chantier": chantier,
         "engin": engin,
         "travail": travail,
@@ -112,12 +113,14 @@ if st.button("💾 ENREGISTRER"):
         st.warning("⚠ Ouvrier + Chantier obligatoires")
 
 # =========================
-# 📊 DATAFRAME SAFE
+# 📊 DATAFRAME ANTI-BUG
 # =========================
 df = pd.DataFrame(historique)
 
-cols = ["date","ouvrier","chantier","engin","travail",
-        "matin_debut","matin_fin","aprem_debut","aprem_fin","total"]
+cols = [
+    "date","ouvrier","client","chantier","engin","travail",
+    "matin_debut","matin_fin","aprem_debut","aprem_fin","total"
+]
 
 for c in cols:
     if c not in df.columns:
@@ -136,7 +139,7 @@ if not df.empty:
     st.metric("Moyenne", round(float(df["total"].mean()), 2))
 
 # =========================
-# 📄 PDF
+# 📄 PDF PROPRE
 # =========================
 class PDF(FPDF):
     def header(self):
@@ -155,6 +158,7 @@ def export_pdf(dataframe):
     for _, row in dataframe.iterrows():
         pdf.cell(0, 7, f"Date : {row['date']}", ln=True)
         pdf.cell(0, 7, f"Ouvrier : {row['ouvrier']}", ln=True)
+        pdf.cell(0, 7, f"Entreprise / Client : {row['client']}", ln=True)
         pdf.cell(0, 7, f"Chantier : {row['chantier']}", ln=True)
         pdf.cell(0, 7, f"Engin : {row['engin']}", ln=True)
         pdf.cell(0, 7, f"Matin : {row['matin_debut']} - {row['matin_fin']}", ln=True)
@@ -183,7 +187,7 @@ if st.button("📊 EXCEL"):
         wb = Workbook()
         ws = wb.active
         ws.append([
-            "Date","Ouvrier","Chantier","Engin","Travail",
+            "Date","Ouvrier","Client","Chantier","Engin","Travail",
             "Matin début","Matin fin","Aprem début","Aprem fin","Total"
         ])
         wb.save(file)
@@ -194,6 +198,7 @@ if st.button("📊 EXCEL"):
     ws.append([
         date_jour,
         ouvrier,
+        client,
         chantier,
         engin,
         travail,
