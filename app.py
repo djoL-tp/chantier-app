@@ -152,11 +152,11 @@ def export_pdf(dataframe):
     pdf.add_page()
     pdf.set_font("Arial", size=10)
 
-    # 🔥 AMPLITUDE MODIFIÉE
     pdf.cell(0, 8, "Amplitude horaire : 07h30 / 12h00 - 13h30 / 17h00", ln=True)
     pdf.ln(3)
 
     for _, row in dataframe.iterrows():
+        pdf.set_text_color(0, 0, 0)
         pdf.cell(0, 7, f"Date : {row['date']}", ln=True)
         pdf.cell(0, 7, f"Ouvrier : {row['ouvrier']}", ln=True)
         pdf.cell(0, 7, f"Entreprise / Client : {row['client']}", ln=True)
@@ -165,9 +165,18 @@ def export_pdf(dataframe):
 
         pdf.cell(0, 7, f"Travail effectué : {row['travail']}", ln=True)
 
+        # 🔴 MATIN EN ROUGE
+        pdf.set_text_color(255, 0, 0)
         pdf.cell(0, 7, f"Matin : {row['matin_debut']} - {row['matin_fin']}", ln=True)
-        pdf.cell(0, 7, f"Aprem : {row['aprem_debut']} - {row['aprem_fin']}", ln=True)
+
+        # 🔴 APRÈS-MIDI EN ROUGE
+        pdf.set_text_color(255, 0, 0)
+        pdf.cell(0, 7, f"Après-midi : {row['aprem_debut']} - {row['aprem_fin']}", ln=True)
+
+        # ⚫ TOTAL EN NOIR
+        pdf.set_text_color(0, 0, 0)
         pdf.cell(0, 7, f"Total : {row['total']} h", ln=True)
+
         pdf.ln(2)
 
     file = "rapport.pdf"
