@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, time
 import json
 import os
 import pandas as pd
@@ -9,11 +9,7 @@ from openpyxl import Workbook, load_workbook
 # =========================
 # 📱 CONFIG MOBILE
 # =========================
-st.set_page_config(
-    page_title="V17 MOBILE PRO MAX",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="V17 MOBILE PRO MAX", layout="wide")
 
 st.markdown("""
 <style>
@@ -60,16 +56,34 @@ engin = st.text_input("🚜 Engin")
 travail = st.text_area("🧾 Travail effectué")
 
 # =========================
-# ⏱ HEURES
+# ⏱ HEURES (NOUVEAU SYSTÈME)
 # =========================
-h_matin = st.number_input("Heures matin", 0.0, 12.0, step=0.5)
-h_aprem = st.number_input("Heures après-midi", 0.0, 12.0, step=0.5)
+st.subheader("⏱ Horaires")
 
-total = float(h_matin) + float(h_aprem)
-st.write("🕒 Total :", total, "h")
+col1, col2 = st.columns(2)
+
+with col1:
+    matin_debut = st.time_input("Matin début", value=time(8,0))
+    matin_fin = st.time_input("Matin fin", value=time(12,0))
+
+with col2:
+    aprem_debut = st.time_input("Après-midi début", value=time(13,0))
+    aprem_fin = st.time_input("Après-midi fin", value=time(17,30))
+
+def calc_hours(d1, d2):
+    if d1 and d2:
+        t1 = datetime.combine(datetime.today(), d1)
+        t2 = datetime.combine(datetime.today(), d2)
+        if t2 > t1:
+            return (t2 - t1).seconds / 3600
+    return 0
+
+total = calc_hours(matin_debut, matin_fin) + calc_hours(aprem_debut, aprem_fin)
+
+st.write("🕒 Total :", round(total, 2), "h")
 
 # =========================
-# 💾 SAUVEGARDE SAFE
+# 💾 SAUVEGARDE
 # =========================
 def save_entry():
     return {
@@ -78,8 +92,10 @@ def save_entry():
         "chantier": chantier,
         "engin": engin,
         "travail": travail,
-        "matin": h_matin,
-        "aprem": h_aprem,
+        "matin_debut": matin_debut.strftime("%H:%M"),
+        "matin_fin": matin_fin.strftime("%H:%M"),
+        "aprem_debut": aprem_debut.strftime("%H:%M"),
+        "aprem_fin": aprem_fin.strftime("%H:%M"),
         "total": total
     }
 
@@ -93,36 +109,34 @@ if st.button("💾 ENREGISTRER"):
         st.success("Sauvegardé ✔")
         st.rerun()
     else:
-        st.warning("⚠ Remplis Ouvrier + Chantier")
+        st.warning("⚠ Ouvrier + Chantier obligatoires")
 
 # =========================
-# 📊 DATAFRAME ANTI-CRASH
+# 📊 DATAFRAME SAFE
 # =========================
 df = pd.DataFrame(historique)
 
-# 🔥 sécurisation totale colonnes
-cols = ["date","ouvrier","chantier","engin","travail","matin","aprem","total"]
+cols = ["date","ouvrier","chantier","engin","travail",
+        "matin_debut","matin_fin","aprem_debut","aprem_fin","total"]
 
 for c in cols:
     if c not in df.columns:
-        df[c] = 0 if c == "total" else ""
+        df[c] = ""
 
-# conversion safe
 df["total"] = pd.to_numeric(df["total"], errors="coerce").fillna(0)
 
 st.dataframe(df, use_container_width=True)
 
 # =========================
-# 📊 STATS SAFE
+# 📊 STATS
 # =========================
 if not df.empty:
     st.subheader("📊 Statistiques")
-
     st.metric("Total heures", float(df["total"].sum()))
     st.metric("Moyenne", round(float(df["total"].mean()), 2))
 
 # =========================
-# 📄 PDF STABLE
+# 📄 PDF
 # =========================
 class PDF(FPDF):
     def header(self):
@@ -135,7 +149,6 @@ def export_pdf(dataframe):
     pdf.add_page()
     pdf.set_font("Arial", size=10)
 
-    # 🔥 AMPLITUDE FIXE
     pdf.cell(0, 8, "Amplitude horaire : 08h00 / 12h00 - 13h00 / 17h30", ln=True)
     pdf.ln(3)
 
@@ -144,7 +157,8 @@ def export_pdf(dataframe):
         pdf.cell(0, 7, f"Ouvrier : {row['ouvrier']}", ln=True)
         pdf.cell(0, 7, f"Chantier : {row['chantier']}", ln=True)
         pdf.cell(0, 7, f"Engin : {row['engin']}", ln=True)
-        pdf.cell(0, 7, f"Travail : {row['travail']}", ln=True)
+        pdf.cell(0, 7, f"Matin : {row['matin_debut']} - {row['matin_fin']}", ln=True)
+        pdf.cell(0, 7, f"Aprem : {row['aprem_debut']} - {row['aprem_fin']}", ln=True)
         pdf.cell(0, 7, f"Total : {row['total']} h", ln=True)
         pdf.ln(2)
 
@@ -155,12 +169,11 @@ def export_pdf(dataframe):
 if not df.empty:
     if st.button("📄 PDF"):
         file = export_pdf(df)
-
         with open(file, "rb") as f:
             st.download_button("Télécharger PDF", f, file_name="rapport.pdf")
 
 # =========================
-# 📊 EXCEL SAFE
+# 📊 EXCEL
 # =========================
 if st.button("📊 EXCEL"):
 
@@ -169,7 +182,10 @@ if st.button("📊 EXCEL"):
     if not os.path.exists(file):
         wb = Workbook()
         ws = wb.active
-        ws.append(["Date","Ouvrier","Chantier","Engin","Travail","Matin","Aprem","Total"])
+        ws.append([
+            "Date","Ouvrier","Chantier","Engin","Travail",
+            "Matin début","Matin fin","Aprem début","Aprem fin","Total"
+        ])
         wb.save(file)
 
     wb = load_workbook(file)
@@ -181,8 +197,10 @@ if st.button("📊 EXCEL"):
         chantier,
         engin,
         travail,
-        h_matin,
-        h_aprem,
+        matin_debut.strftime("%H:%M"),
+        matin_fin.strftime("%H:%M"),
+        aprem_debut.strftime("%H:%M"),
+        aprem_fin.strftime("%H:%M"),
         total
     ])
 
@@ -192,7 +210,7 @@ if st.button("📊 EXCEL"):
         st.download_button("Télécharger Excel", f, file_name="chantier.xlsx")
 
 # =========================
-# 🧹 RESET SAFE
+# 🧹 RESET
 # =========================
 if st.button("🧹 RESET"):
     historique = []
