@@ -81,13 +81,13 @@ if not df.empty:
     col3.metric("30 derniers jours", f"{mois['total'].sum():.2f} h")
 
 # -------------------------
-# PDF PRO
+# PDF EXPORT
 # -------------------------
 def export_pdf(dataframe):
     pdf = FPDF()
     pdf.add_page()
 
-    # 🔥 Unicode FIX
+    # 🔥 POLICE UNICODE (clé du problème)
     pdf.add_font("DejaVu", "", "DejaVuSans.ttf")
     pdf.set_font("DejaVu", size=10)
 
@@ -105,22 +105,19 @@ def export_pdf(dataframe):
         pdf.set_fill_color(230, 230, 230)
         pdf.cell(0, 8, f"{row['date']} - {row['ouvrier']} - {row['chantier']}", ln=True, fill=True)
 
-        # 🔴 AMPLITUDE
+        # 🔴 AMPLITUDE + HEURES
         pdf.set_text_color(200, 0, 0)
         pdf.cell(0, 6, f"Amplitude : {row['amplitude']}", ln=True)
-
         pdf.cell(0, 6, f"Matin : {row['matin']} h", ln=True)
         pdf.cell(0, 6, f"Après-midi : {row['aprem']} h", ln=True)
 
         pdf.set_text_color(0, 0, 0)
-
         pdf.cell(0, 6, f"Total : {row['total']} h", ln=True)
 
-        # 🔥 TEXTE SAFE
+        # 🔥 TEXTE SANS BUG
         pdf.multi_cell(0, 6, f"Travail effectué : {row['travail']}")
 
         pdf.ln(4)
-
         total_general += row["total"]
 
     pdf.ln(5)
