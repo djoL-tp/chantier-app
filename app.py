@@ -65,9 +65,6 @@ if not df.empty:
     st.subheader("📊 Données")
     st.dataframe(df, use_container_width=True)
 
-    # -------------------------
-    # STATS
-    # -------------------------
     st.subheader("📈 Statistiques")
 
     df["date_dt"] = pd.to_datetime(df["date"], format="%d/%m/%Y")
@@ -77,57 +74,67 @@ if not df.empty:
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total général", f"{df['total'].sum():.2f} h")
-    col2.metric("7 derniers jours", f"{semaine['total'].sum():.2f} h")
-    col3.metric("30 derniers jours", f"{mois['total'].sum():.2f} h")
+    col2.metric("7 jours", f"{semaine['total'].sum():.2f} h")
+    col3.metric("30 jours", f"{mois['total'].sum():.2f} h")
 
 # -------------------------
-# PDF EXPORT
+# SAFE TEXT (IMPORTANT)
+# -------------------------
+def safe_text(text):
+    return str(text).encode("latin-1", "replace").decode("latin-1")
+
+# -------------------------
+# PDF EXPORT (ARIAL)
 # -------------------------
 def export_pdf(dataframe):
     pdf = FPDF()
     pdf.add_page()
 
-    # 🔥 POLICE UNICODE (clé du problème)
-    pdf.add_font("DejaVu", "", "DejaVuSans.ttf")
-    pdf.set_font("DejaVu", size=10)
+    # 🔥 ARIAL 10 (par défaut FPDF)
+    pdf.set_font("Arial", size=10)
 
-    # TITRE
-    pdf.set_font("DejaVu", size=16)
-    pdf.cell(0, 10, "RAPPORT CHANTIER", ln=True, align="C")
+    pdf.set_font("Arial", size=16)
+    pdf.cell(0, 10, "RAPPORT CHANTIER V17 PRO MAX", ln=True, align="C")
     pdf.ln(5)
 
-    pdf.set_font("DejaVu", size=10)
+    pdf.set_font("Arial", size=10)
 
     total_general = 0
 
     for _, row in dataframe.iterrows():
 
         pdf.set_fill_color(230, 230, 230)
-        pdf.cell(0, 8, f"{row['date']} - {row['ouvrier']} - {row['chantier']}", ln=True, fill=True)
+        pdf.cell(
+            0, 8,
+            safe_text(f"{row['date']} - {row['ouvrier']} - {row['chantier']}"),
+            ln=True,
+            fill=True
+        )
 
-        # 🔴 AMPLITUDE + HEURES
+        # 🔴 MATIN / APREM
         pdf.set_text_color(200, 0, 0)
-        pdf.cell(0, 6, f"Amplitude : {row['amplitude']}", ln=True)
-        pdf.cell(0, 6, f"Matin : {row['matin']} h", ln=True)
-        pdf.cell(0, 6, f"Après-midi : {row['aprem']} h", ln=True)
+        pdf.cell(0, 6, safe_text(f"Amplitude : {row['amplitude']}"), ln=True)
+        pdf.cell(0, 6, safe_text(f"Matin : {row['matin']} h"), ln=True)
+        pdf.cell(0, 6, safe_text(f"Après-midi : {row['aprem']} h"), ln=True)
 
         pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 6, f"Total : {row['total']} h", ln=True)
 
-        # 🔥 TEXTE SANS BUG
-        pdf.multi_cell(0, 6, f"Travail effectué : {row['travail']}")
+        pdf.cell(0, 6, safe_text(f"Total : {row['total']} h"), ln=True)
+
+        pdf.multi_cell(0, 6, safe_text(f"Travail effectué : {row['travail']}"))
 
         pdf.ln(4)
+
         total_general += row["total"]
 
     pdf.ln(5)
-    pdf.set_font("DejaVu", size=12)
-    pdf.cell(0, 10, f"TOTAL GENERAL : {total_general:.2f} h", ln=True)
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 10, safe_text(f"TOTAL GENERAL : {total_general:.2f} h"), ln=True)
 
     return pdf.output(dest="S").encode("latin-1")
 
 # -------------------------
-# EXPORT
+# EXPORT BUTTONS
 # -------------------------
 if not df.empty:
 
@@ -148,5 +155,6 @@ if not df.empty:
         st.download_button(
             "📊 Télécharger Excel",
             buffer.getvalue(),
-            file_name="rapport_chantier.xlsx"
+            file_name="rapport_chantier.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
