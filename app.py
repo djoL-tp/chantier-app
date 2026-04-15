@@ -1,238 +1,164 @@
 import streamlit as st
-from datetime import datetime
-import json
-import os
 import pandas as pd
+from datetime import datetime
 from fpdf import FPDF
-from openpyxl import Workbook, load_workbook
+from PIL import Image
+import io
 
-# =========================
-# 📱 CONFIG MOBILE
-# =========================
-st.set_page_config(page_title="V17 MOBILE PRO MAX", layout="wide")
+st.set_page_config(page_title="Chantier PRO MAX", layout="wide")
 
-st.markdown("""
-<style>
-.block-container {padding: 10px !important;}
-</style>
-""", unsafe_allow_html=True)
+# -------------------------
+# INIT
+# -------------------------
+if "data" not in st.session_state:
+    st.session_state.data = []
 
-st.title("📱 V17 MOBILE PRO MAX")
+# -------------------------
+# TITRE
+# -------------------------
+st.title("📋 Suivi de chantier ULTRA PRO")
 
-# =========================
-# 📂 HISTORIQUE SAFE
-# =========================
-FILE = "historique.json"
+# -------------------------
+# FORMULAIRE
+# -------------------------
+with st.form("formulaire"):
+    col1, col2 = st.columns(2)
 
-if os.path.exists(FILE):
-    try:
-        with open(FILE, "r") as f:
-            historique = json.load(f)
-    except:
-        historique = []
-else:
-    historique = []
+    with col1:
+        date = st.date_input("Date", datetime.today())
+        ouvrier = st.text_input("Nom ouvrier")
+        chantier = st.text_input("Chantier")
 
-# =========================
-# 📅 DATE FR
-# =========================
-def date_fr():
-    jours = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"]
-    mois = ["janvier","février","mars","avril","mai","juin",
-            "juillet","août","septembre","octobre","novembre","décembre"]
+    with col2:
+        debut_matin = st.time_input("Début matin")
+        fin_matin = st.time_input("Fin matin")
+        debut_aprem = st.time_input("Début après-midi")
+        fin_journee = st.time_input("Fin journée")
 
-    now = datetime.now()
-    return f"{jours[now.weekday()]} {now.day} {mois[now.month-1]} {now.year}"
+    travail = st.text_area("Travail effectué")
 
-date_jour = date_fr()
-st.write("📅", date_jour)
+    photo = st.file_uploader("📸 Photo chantier", type=["jpg", "png"])
+    signature = st.file_uploader("✍️ Signature", type=["png"])
 
-# =========================
-# 👷 INPUTS
-# =========================
-ouvrier = st.text_input("👷 Ouvrier")
-client = st.text_input("🏢 Entreprise / Client")
-chantier = st.text_input("🏗 Chantier")
-engin = st.text_input("🚜 Engin")
-travail = st.text_area("🧾 Travail effectué")
+    submit = st.form_submit_button("Ajouter")
 
-# =========================
-# ⏱ HORAIRES
-# =========================
-st.subheader("⏱ Horaires")
+    if submit:
+        h_matin = (datetime.combine(date, fin_matin) - datetime.combine(date, debut_matin)).seconds / 3600
+        h_aprem = (datetime.combine(date, fin_journee) - datetime.combine(date, debut_aprem)).seconds / 3600
+        total = h_matin + h_aprem
 
-col1, col2 = st.columns(2)
+        st.session_state.data.append({
+            "date": date.strftime("%d/%m/%Y"),
+            "ouvrier": ouvrier,
+            "chantier": chantier,
+            "matin": round(h_matin, 2),
+            "aprem": round(h_aprem, 2),
+            "total": round(total, 2),
+            "travail": travail,
+            "photo": photo,
+            "signature": signature
+        })
 
-with col1:
-    matin_debut = st.time_input("Matin début", value=datetime.strptime("07:30", "%H:%M").time())
-    matin_fin = st.time_input("Matin fin", value=datetime.strptime("12:00", "%H:%M").time())
+# -------------------------
+# DATA
+# -------------------------
+df = pd.DataFrame(st.session_state.data)
 
-with col2:
-    aprem_debut = st.time_input("Après-midi début", value=datetime.strptime("13:30", "%H:%M").time())
-    aprem_fin = st.time_input("Après-midi fin", value=datetime.strptime("17:00", "%H:%M").time())
-
-def calc_hours(d1, d2):
-    t1 = datetime.combine(datetime.today(), d1)
-    t2 = datetime.combine(datetime.today(), d2)
-    if t2 > t1:
-        return (t2 - t1).seconds / 3600
-    return 0
-
-total = calc_hours(matin_debut, matin_fin) + calc_hours(aprem_debut, aprem_fin)
-
-st.write("🕒 Total :", round(total, 2), "h")
-
-# =========================
-# 💾 SAUVEGARDE
-# =========================
-def save_entry():
-    return {
-        "date": date_jour,
-        "ouvrier": ouvrier,
-        "client": client,
-        "chantier": chantier,
-        "engin": engin,
-        "travail": travail,
-        "matin_debut": matin_debut.strftime("%H:%M"),
-        "matin_fin": matin_fin.strftime("%H:%M"),
-        "aprem_debut": aprem_debut.strftime("%H:%M"),
-        "aprem_fin": aprem_fin.strftime("%H:%M"),
-        "total": total
-    }
-
-if st.button("💾 ENREGISTRER"):
-    if ouvrier and chantier:
-        historique.append(save_entry())
-
-        with open(FILE, "w") as f:
-            json.dump(historique, f, indent=4)
-
-        st.success("Sauvegardé ✔")
-        st.rerun()
-    else:
-        st.warning("⚠ Ouvrier + Chantier obligatoires")
-
-# =========================
-# 📊 DATAFRAME ANTI-BUG
-# =========================
-df = pd.DataFrame(historique)
-
-cols = [
-    "date","ouvrier","client","chantier","engin","travail",
-    "matin_debut","matin_fin","aprem_debut","aprem_fin","total"
-]
-
-for c in cols:
-    if c not in df.columns:
-        df[c] = ""
-
-df["total"] = pd.to_numeric(df["total"], errors="coerce").fillna(0)
-
-st.dataframe(df, use_container_width=True)
-
-# =========================
-# 📊 STATS
-# =========================
 if not df.empty:
-    st.subheader("📊 Statistiques")
-    st.metric("Total heures", float(df["total"].sum()))
-    st.metric("Moyenne", round(float(df["total"].mean()), 2))
+    st.subheader("📊 Données")
+    st.dataframe(df.drop(columns=["photo", "signature"]), use_container_width=True)
 
-# =========================
-# 📄 PDF
-# =========================
-class PDF(FPDF):
-    def header(self):
-        self.set_font("Arial", "B", 12)
-        self.cell(0, 10, "V17 MOBILE PRO MAX", ln=True, align="C")
-        self.ln(5)
+    # -------------------------
+    # STATS
+    # -------------------------
+    st.subheader("📈 Statistiques")
 
+    total_heure = df["total"].sum()
+    st.metric("Total heures", f"{round(total_heure,2)} h")
+
+# -------------------------
+# PDF EXPORT PRO
+# -------------------------
 def export_pdf(dataframe):
-    pdf = PDF()
+    pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=10)
 
-    pdf.cell(0, 8, "Amplitude horaire : 07h30 / 12h00 - 13h30 / 17h00", ln=True)
-    pdf.ln(3)
+    # 🔥 POLICE UNICODE (OBLIGATOIRE)
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf")
+    pdf.set_font("DejaVu", size=10)
+
+    # TITRE
+    pdf.set_font("DejaVu", size=16)
+    pdf.cell(0, 10, "RAPPORT DE CHANTIER", ln=True, align="C")
+    pdf.ln(5)
+
+    pdf.set_font("DejaVu", size=10)
+
+    total_general = 0
 
     for _, row in dataframe.iterrows():
+
+        pdf.set_fill_color(230, 230, 230)
+        pdf.cell(0, 8, f"{row['date']} - {row['ouvrier']} - {row['chantier']}", ln=True, fill=True)
+
+        # MATIN
+        pdf.set_text_color(200, 0, 0)
+        pdf.cell(0, 6, f"Matin : {row['matin']} h", ln=True)
+
+        # APREM
+        pdf.cell(0, 6, f"Après-midi : {row['aprem']} h", ln=True)
+
         pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 7, f"Date : {row['date']}", ln=True)
-        pdf.cell(0, 7, f"Ouvrier : {row['ouvrier']}", ln=True)
-        pdf.cell(0, 7, f"Entreprise / Client : {row['client']}", ln=True)
-        pdf.cell(0, 7, f"Chantier : {row['chantier']}", ln=True)
-        pdf.cell(0, 7, f"Engin : {row['engin']}", ln=True)
 
-        pdf.cell(0, 7, f"Travail effectué : {row['travail']}", ln=True)
+        pdf.cell(0, 6, f"Total : {row['total']} h", ln=True)
 
-        # 🔴 MATIN EN ROUGE
-        pdf.set_text_color(255, 0, 0)
-        pdf.cell(0, 7, f"Matin : {row['matin_debut']} - {row['matin_fin']}", ln=True)
+        pdf.multi_cell(0, 6, f"Travail effectué : {row['travail']}")
 
-        # 🔴 APRÈS-MIDI EN ROUGE
-        pdf.set_text_color(255, 0, 0)
-        pdf.cell(0, 7, f"Après-midi : {row['aprem_debut']} - {row['aprem_fin']}", ln=True)
+        # PHOTO
+        if row["photo"] is not None:
+            image = Image.open(row["photo"])
+            img_path = f"/tmp/photo_{_}.jpg"
+            image.save(img_path)
+            pdf.image(img_path, w=100)
 
-        # ⚫ TOTAL EN NOIR
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 7, f"Total : {row['total']} h", ln=True)
+        # SIGNATURE
+        if row["signature"] is not None:
+            sign = Image.open(row["signature"])
+            sign_path = f"/tmp/sign_{_}.png"
+            sign.save(sign_path)
+            pdf.image(sign_path, w=50)
 
-        pdf.ln(2)
+        pdf.ln(5)
 
-    file = "rapport.pdf"
-    pdf.output(file)
-    return file
+        total_general += row["total"]
 
+    pdf.ln(5)
+    pdf.set_font("DejaVu", size=12)
+    pdf.cell(0, 10, f"TOTAL GENERAL : {round(total_general,2)} h", ln=True)
+
+    return pdf.output(dest="S").encode("latin-1")
+
+# -------------------------
+# EXPORT
+# -------------------------
 if not df.empty:
-    if st.button("📄 PDF"):
-        file = export_pdf(df)
-        with open(file, "rb") as f:
-            st.download_button("Télécharger PDF", f, file_name="rapport.pdf")
 
-# =========================
-# 📊 EXCEL
-# =========================
-if st.button("📊 EXCEL"):
+    col1, col2 = st.columns(2)
 
-    file = "chantier.xlsx"
+    with col1:
+        pdf_file = export_pdf(df)
+        st.download_button(
+            "📄 Télécharger PDF PRO",
+            pdf_file,
+            file_name="rapport_chantier.pdf",
+            mime="application/pdf"
+        )
 
-    if not os.path.exists(file):
-        wb = Workbook()
-        ws = wb.active
-        ws.append([
-            "Date","Ouvrier","Client","Chantier","Engin","Travail",
-            "Matin début","Matin fin","Aprem début","Aprem fin","Total"
-        ])
-        wb.save(file)
-
-    wb = load_workbook(file)
-    ws = wb.active
-
-    ws.append([
-        date_jour,
-        ouvrier,
-        client,
-        chantier,
-        engin,
-        travail,
-        matin_debut.strftime("%H:%M"),
-        matin_fin.strftime("%H:%M"),
-        aprem_debut.strftime("%H:%M"),
-        aprem_fin.strftime("%H:%M"),
-        total
-    ])
-
-    wb.save(file)
-
-    with open(file, "rb") as f:
-        st.download_button("Télécharger Excel", f, file_name="chantier.xlsx")
-
-# =========================
-# 🧹 RESET
-# =========================
-if st.button("🧹 RESET"):
-    historique = []
-    if os.path.exists(FILE):
-        os.remove(FILE)
-    st.success("Reset OK")
-    st.rerun()
+    with col2:
+        excel_buffer = io.BytesIO()
+        df.drop(columns=["photo", "signature"]).to_excel(excel_buffer, index=False)
+        st.download_button(
+            "📊 Télécharger Excel",
+            excel_buffer.getvalue(),
+            file_name="rapport_chantier.xlsx"
+        )
