@@ -1,7 +1,6 @@
 streamlit
 pandas
-Pillow
-reportlab
-streamlit-drawable-canvas
-openpyxl
 fpdf2
+openpyxl
+Pillow
+streamlit-drawable-canvas
