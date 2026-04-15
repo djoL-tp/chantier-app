@@ -3,4 +3,3 @@ pandas
 fpdf2
 openpyxl
 Pillow
-streamlit-drawable-canvas
